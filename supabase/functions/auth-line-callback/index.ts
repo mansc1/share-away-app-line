@@ -6,10 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Verify id_token using LINE's Verify API (avoids JWKS kid mismatch)
+// Verify id_token using LINE's Verify API
 async function verifyIdToken(
   idToken: string,
-  expectedNonce: string,
   channelId: string
 ): Promise<any> {
   const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
@@ -18,16 +17,16 @@ async function verifyIdToken(
     body: new URLSearchParams({
       id_token: idToken,
       client_id: channelId,
-      nonce: expectedNonce,
     }),
   });
 
+  const body = await res.json();
+
   if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`LINE verify API returned ${res.status}: ${errBody}`);
+    throw new Error(`LINE verify API ${res.status}: ${JSON.stringify(body)}`);
   }
 
-  return await res.json();
+  return body;
 }
 
 Deno.serve(async (req) => {
@@ -126,7 +125,7 @@ Deno.serve(async (req) => {
     // Verify id_token
     let claims: any;
     try {
-      claims = await verifyIdToken(idToken, authState.nonce, LINE_CHANNEL_ID);
+      claims = await verifyIdToken(idToken, LINE_CHANNEL_ID);
     } catch (err) {
       const msg = (err as Error).message;
       console.error("id_token verification failed:", msg);
