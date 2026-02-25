@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
+import { LineAuthProvider } from "./contexts/LineAuthContext";
 
 const queryClient = new QueryClient();
 
@@ -16,11 +17,13 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/app" element={<Index />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <LineAuthProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/app" element={<Index />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </LineAuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

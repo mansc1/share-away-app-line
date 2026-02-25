@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { User, QrCode, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getLineLoginUrl } from "@/contexts/LineAuthContext";
 
 const features = [
   { title: "เพิ่มรายจ่ายง่าย ๆ", desc: "เลือกคนจ่าย เลือกคนแชร์ ระบบคำนวณให้อัตโนมัติ" },
@@ -22,7 +23,9 @@ const LandingPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-5 max-w-3xl mx-auto">
         <span className="text-xl font-bold tracking-tight">TripSplit</span>
-        <Button variant="outline" size="sm">Sign in</Button>
+        <a href={getLineLoginUrl()}>
+          <Button variant="outline" size="sm">Sign in</Button>
+        </a>
       </header>
 
       {/* Hero */}
@@ -35,7 +38,7 @@ const LandingPage = () => {
           เข้าสู่ระบบด้วย LINE แล้วเริ่มทริปได้ทันที
         </p>
         <div className="mt-10 flex flex-col items-center gap-3">
-          <a href="/auth/line/start">
+          <a href={getLineLoginUrl()}>
             <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white text-base px-8 py-6 rounded-xl">
               เริ่มทริปด้วย LINE
             </Button>
@@ -80,7 +83,7 @@ const LandingPage = () => {
       {/* Final CTA */}
       <section className="px-6 pb-20 max-w-3xl mx-auto text-center">
         <p className="text-xl font-semibold mb-6">พร้อมเริ่มทริปแล้วหรือยัง?</p>
-        <a href="/auth/line/start">
+        <a href={getLineLoginUrl()}>
           <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white text-base px-8 py-6 rounded-xl">
             เข้าสู่ระบบด้วย LINE
           </Button>
