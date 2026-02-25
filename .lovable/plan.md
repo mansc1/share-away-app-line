@@ -1,25 +1,38 @@
 
 
-## Problem
+## Plan: Debug LINE Login — Better Error Reporting
 
-The screenshot shows a **404 error** when LINE redirects back to `https://share-away-app-line.lovable.app/auth/line/callback?code=...&state=...`. This is a classic **SPA routing issue** — the hosting server doesn't recognize `/auth/line/callback` as a valid path and returns 404 instead of serving `index.html`.
+### Problem
+The `auth-line-callback` edge function returns generic `internal_error` messages. The logs show `No matching key found in LINE JWKS` errors, but the frontend only displays "Login failed: internal_error" with no actionable details.
 
-The React Router route exists in `App.tsx`, but the server never gets a chance to serve the SPA because it returns 404 for unknown paths.
+### Changes
 
-## Solution
+#### 1. Edge Function: `supabase/functions/auth-line-callback/index.ts`
 
-Add a `public/_redirects` file to configure the hosting server to serve `index.html` for all routes (SPA fallback). Lovable's hosting uses this file to handle client-side routing.
+**Improve error handling in token exchange (around line 107-120):**
+- When `tokenRes` fails, parse the response as JSON and return `line_status`, `line_error`, `line_error_description`, and `redirect_uri_used` in the error response.
 
-### File to create
+**Improve error handling in id_token verification (around line 134):**
+- Wrap `verifyIdToken()` call in its own try/catch.
+- Return the specific error message (e.g., "No matching key found in LINE JWKS") in the response JSON.
 
-**`public/_redirects`**
-```
-/*    /index.html   200
-```
+**Improve the outer catch block (around line 172-177):**
+- Return `err.message` in the response instead of just `"internal_error"`.
 
-This single line tells the server: for any path that doesn't match a static file, serve `index.html` with a 200 status, allowing React Router to handle the route.
+**Log the redirect_uri being used** for debugging.
 
-### No other changes needed
-- `App.tsx` already has the correct route for `/auth/line/callback`
-- `LineCallbackPage.tsx` already handles the OAuth exchange correctly
+#### 2. Frontend: `src/pages/LineCallbackPage.tsx`
+
+**Enhance error display (around line 37-39):**
+- When the edge function returns error JSON with `details`, parse and display all fields: `line_status`, `line_error`, `line_error_description`, `redirect_uri_used`, and `message`.
+- Show a more detailed error card instead of just the error code string.
+
+### Technical Details
+
+The key error from logs is `No matching key found in LINE JWKS` — this means the JWT `kid` header doesn't match any key from `https://api.line.me/oauth2/v2.1/certs`. This could indicate:
+- LINE rotated their JWKS keys between the token being issued and verification
+- A caching issue
+- The id_token's `kid` is using a different algorithm
+
+The improved error reporting will surface the exact failure point so we can diagnose further.
 
