@@ -6,58 +6,28 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Decode base64url
-function base64urlDecode(str: string): Uint8Array {
-  str = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (str.length % 4) str += "=";
-  const binary = atob(str);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-// Import RSA public key from JWK
-async function importKey(jwk: any): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "jwk",
-    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: jwk.alg, ext: true },
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-}
-
-// Verify JWT using LINE JWKS
+// Verify id_token using LINE's Verify API (avoids JWKS kid mismatch)
 async function verifyIdToken(
   idToken: string,
   expectedNonce: string,
   channelId: string
 ): Promise<any> {
-  const parts = idToken.split(".");
-  if (parts.length !== 3) throw new Error("Invalid JWT format");
+  const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      id_token: idToken,
+      client_id: channelId,
+      nonce: expectedNonce,
+    }),
+  });
 
-  const header = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[0])));
-  const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1])));
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`LINE verify API returned ${res.status}: ${errBody}`);
+  }
 
-  // Fetch LINE JWKS
-  const jwksRes = await fetch("https://api.line.me/oauth2/v2.1/certs");
-  const jwks = await jwksRes.json();
-  const key = jwks.keys.find((k: any) => k.kid === header.kid);
-  if (!key) throw new Error("No matching key found in LINE JWKS");
-
-  // Verify signature
-  const cryptoKey = await importKey(key);
-  const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-  const signature = base64urlDecode(parts[2]);
-  const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", cryptoKey, signature, data);
-  if (!valid) throw new Error("Invalid JWT signature");
-
-  // Validate claims
-  if (payload.aud !== channelId) throw new Error("Invalid aud");
-  if (payload.exp * 1000 < Date.now()) throw new Error("Token expired");
-  if (payload.nonce !== expectedNonce) throw new Error("Invalid nonce");
-
-  return payload;
+  return await res.json();
 }
 
 Deno.serve(async (req) => {
@@ -162,7 +132,7 @@ Deno.serve(async (req) => {
       console.error("id_token verification failed:", msg);
       // Extract kid from token for debugging
       let kid = "unknown";
-      try { kid = JSON.parse(new TextDecoder().decode(base64urlDecode(idToken.split(".")[0]))).kid; } catch {}
+      try { kid = JSON.parse(atob(idToken.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).kid; } catch {}
       return new Response(JSON.stringify({
         error: "id_token_verification_failed",
         message: msg,
