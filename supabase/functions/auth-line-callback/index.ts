@@ -101,43 +101,78 @@ Deno.serve(async (req) => {
 
     const LINE_CHANNEL_ID = Deno.env.get("LINE_CHANNEL_ID")!;
     const LINE_CHANNEL_SECRET = Deno.env.get("LINE_CHANNEL_SECRET")!;
-    const APP_BASE_URL = Deno.env.get("APP_BASE_URL")!;
-    const redirectUri = `${APP_BASE_URL}/auth/line/callback`;
+    const redirectUri = "https://share-away-app-line.lovable.app/auth/line/callback";
+
+    console.log("Using redirect_uri:", redirectUri);
 
     // Exchange code for tokens
-    const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-        client_id: LINE_CHANNEL_ID,
-        client_secret: LINE_CHANNEL_SECRET,
-      }),
-    });
+    let tokenData: any;
+    try {
+      const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+          client_id: LINE_CHANNEL_ID,
+          client_secret: LINE_CHANNEL_SECRET,
+        }),
+      });
 
-    if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      console.error("Token exchange failed:", errBody);
-      return new Response(JSON.stringify({ error: "token_exchange_failed" }), {
+      if (!tokenRes.ok) {
+        let lineError: any = {};
+        try { lineError = await tokenRes.json(); } catch { lineError = { raw: await tokenRes.text() }; }
+        console.error("Token exchange failed:", JSON.stringify(lineError));
+        return new Response(JSON.stringify({
+          error: "token_exchange_failed",
+          line_status: tokenRes.status,
+          line_error: lineError.error || null,
+          line_error_description: lineError.error_description || null,
+          redirect_uri_used: redirectUri,
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      tokenData = await tokenRes.json();
+    } catch (err) {
+      console.error("Token exchange network error:", err);
+      return new Response(JSON.stringify({ error: "token_exchange_network_error", message: (err as Error).message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const tokenData = await tokenRes.json();
     const idToken = tokenData.id_token;
-
     if (!idToken) {
-      return new Response(JSON.stringify({ error: "no_id_token" }), {
+      return new Response(JSON.stringify({ error: "no_id_token", token_keys: Object.keys(tokenData) }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Verify id_token
-    const claims = await verifyIdToken(idToken, authState.nonce, LINE_CHANNEL_ID);
+    let claims: any;
+    try {
+      claims = await verifyIdToken(idToken, authState.nonce, LINE_CHANNEL_ID);
+    } catch (err) {
+      const msg = (err as Error).message;
+      console.error("id_token verification failed:", msg);
+      // Extract kid from token for debugging
+      let kid = "unknown";
+      try { kid = JSON.parse(new TextDecoder().decode(base64urlDecode(idToken.split(".")[0]))).kid; } catch {}
+      return new Response(JSON.stringify({
+        error: "id_token_verification_failed",
+        message: msg,
+        token_kid: kid,
+        redirect_uri_used: redirectUri,
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const lineSub = claims.sub;
     const displayName = claims.name || null;
@@ -196,8 +231,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("auth-line-callback error:", err);
-    return new Response(JSON.stringify({ error: "internal_error" }), {
+    const msg = (err as Error).message || "unknown";
+    console.error("auth-line-callback error:", msg, err);
+    return new Response(JSON.stringify({ error: "internal_error", message: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
