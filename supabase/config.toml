@@ -1,1 +1,13 @@
 project_id = "qqhkbignitvwedwtqxdn"
+
+[functions.auth-line-start]
+verify_jwt = false
+
+[functions.auth-line-callback]
+verify_jwt = false
+
+[functions.auth-me]
+verify_jwt = false
+
+[functions.auth-logout]
+verify_jwt = false

@@ -52,17 +52,6 @@ export const LineAuthProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     const init = async () => {
-      // Check URL for session_token (callback redirect)
-      const params = new URLSearchParams(window.location.search);
-      const tokenFromUrl = params.get('session_token');
-      if (tokenFromUrl) {
-        localStorage.setItem(SESSION_KEY, tokenFromUrl);
-        // Clean URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('session_token');
-        window.history.replaceState({}, '', url.pathname);
-      }
-
       const token = localStorage.getItem(SESSION_KEY);
       if (token) {
         const u = await fetchMe(token);

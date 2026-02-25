@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
     );
 
     const LINE_CHANNEL_ID = Deno.env.get("LINE_CHANNEL_ID")!;
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const redirectUri = `${SUPABASE_URL}/functions/v1/auth-line-callback`;
+    const APP_BASE_URL = Deno.env.get("APP_BASE_URL")!;
+    const redirectUri = `${APP_BASE_URL}/auth/line/callback`;
 
     // Generate random state and nonce
     const array = new Uint8Array(32);
