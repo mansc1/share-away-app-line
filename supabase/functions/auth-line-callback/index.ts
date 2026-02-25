@@ -66,27 +66,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-    const errorParam = url.searchParams.get("error");
-
-    // Determine app base URL from Referer or fallback
-    // The edge function URL is like https://xxx.supabase.co/functions/v1/auth-line-callback
-    // We need to redirect to the app, which is on a different domain
-    const appBaseUrl = Deno.env.get("APP_BASE_URL") || url.origin.replace(/\.supabase\.co.*/, ".lovable.app");
-
-    if (errorParam) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=${errorParam}` },
-      });
-    }
+    const { code, state } = await req.json();
 
     if (!code || !state) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=missing_params` },
+      return new Response(JSON.stringify({ error: "missing_params" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -105,9 +90,9 @@ Deno.serve(async (req) => {
 
     if (stateError || !authState) {
       console.error("Invalid state:", stateError);
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=invalid_state` },
+      return new Response(JSON.stringify({ error: "invalid_state" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -116,8 +101,8 @@ Deno.serve(async (req) => {
 
     const LINE_CHANNEL_ID = Deno.env.get("LINE_CHANNEL_ID")!;
     const LINE_CHANNEL_SECRET = Deno.env.get("LINE_CHANNEL_SECRET")!;
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const redirectUri = `${SUPABASE_URL}/functions/v1/auth-line-callback`;
+    const APP_BASE_URL = Deno.env.get("APP_BASE_URL")!;
+    const redirectUri = `${APP_BASE_URL}/auth/line/callback`;
 
     // Exchange code for tokens
     const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
@@ -135,9 +120,9 @@ Deno.serve(async (req) => {
     if (!tokenRes.ok) {
       const errBody = await tokenRes.text();
       console.error("Token exchange failed:", errBody);
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=token_exchange_failed` },
+      return new Response(JSON.stringify({ error: "token_exchange_failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -145,9 +130,9 @@ Deno.serve(async (req) => {
     const idToken = tokenData.id_token;
 
     if (!idToken) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=no_id_token` },
+      return new Response(JSON.stringify({ error: "no_id_token" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -180,9 +165,9 @@ Deno.serve(async (req) => {
         .single();
       if (insertErr || !newUser) {
         console.error("User insert failed:", insertErr);
-        return new Response(null, {
-          status: 302,
-          headers: { Location: `${appBaseUrl}/?error=user_create_failed` },
+        return new Response(JSON.stringify({ error: "user_create_failed" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       userId = newUser.id;
@@ -200,24 +185,21 @@ Deno.serve(async (req) => {
 
     if (sessionErr) {
       console.error("Session create failed:", sessionErr);
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${appBaseUrl}/?error=session_create_failed` },
+      return new Response(JSON.stringify({ error: "session_create_failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Redirect to app with session token
-    return new Response(null, {
-      status: 302,
-      headers: { Location: `${appBaseUrl}/app?session_token=${sessionToken}` },
+    return new Response(JSON.stringify({ session_token: sessionToken }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("auth-line-callback error:", err);
-    const url = new URL(req.url);
-    const appBaseUrl = Deno.env.get("APP_BASE_URL") || url.origin.replace(/\.supabase\.co.*/, ".lovable.app");
-    return new Response(null, {
-      status: 302,
-      headers: { Location: `${appBaseUrl}/?error=internal_error` },
+    return new Response(JSON.stringify({ error: "internal_error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
+import LineCallbackPage from "./pages/LineCallbackPage";
 import { LineAuthProvider } from "./contexts/LineAuthContext";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
         <LineAuthProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/auth/line/callback" element={<LineCallbackPage />} />
             <Route path="/app" element={<Index />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
