@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.get-active-trip]
 verify_jwt = false
 
+[functions.get-invite-info]
+verify_jwt = false
+
 [functions.get-trip-members]
 verify_jwt = false
 
