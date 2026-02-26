@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Crown, User, CheckCircle2, UserPlus } from "lucide-react";
 import MemberNameEditor from "@/components/trip/MemberNameEditor";
 import AddCapacityDialog from "@/components/trip/AddCapacityDialog";
+import InviteShareSection from "@/components/trip/InviteShareSection";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = 'line_session_token';
@@ -116,6 +117,9 @@ const TripManagePage = () => {
             ))}
           </CardContent>
         </Card>
+
+        {/* Invite share (admin only, trip open) */}
+        {isAdmin && !isConfirmed && <InviteShareSection />}
 
         {/* Confirm button (admin only, trip open) */}
         {isAdmin && !isConfirmed && (
