@@ -5,8 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Crown, User, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Crown, User, CheckCircle2, UserPlus } from "lucide-react";
 import MemberNameEditor from "@/components/trip/MemberNameEditor";
+import AddCapacityDialog from "@/components/trip/AddCapacityDialog";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = 'line_session_token';
@@ -14,6 +15,7 @@ const SESSION_KEY = 'line_session_token';
 const TripManagePage = () => {
   const { trip, members, isAdmin, isConfirmed, refetch } = useTrip();
   const [confirming, setConfirming] = useState(false);
+  const [addCapOpen, setAddCapOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -138,6 +140,16 @@ const TripManagePage = () => {
             ✅ รายชื่อถูกยืนยันแล้ว
           </div>
         )}
+
+        {/* Add capacity button (admin only) */}
+        {isAdmin && (
+          <Button variant="outline" className="w-full" onClick={() => setAddCapOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            เพิ่มจำนวนสมาชิก
+          </Button>
+        )}
+
+        <AddCapacityDialog open={addCapOpen} onOpenChange={setAddCapOpen} />
       </div>
     </div>
   );
