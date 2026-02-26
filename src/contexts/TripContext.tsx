@@ -50,6 +50,7 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   const [members, setMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [noTrip, setNoTrip] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getToken = () => localStorage.getItem(SESSION_KEY);
 
@@ -92,31 +93,40 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Realtime subscription for trip_members
+  const debouncedRefetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchTrip();
+    }, 300);
+  }, [fetchTrip]);
+
+  // Realtime subscription keyed on trip.id — only re-subscribes when trip actually changes
+  const activeTripId = trip?.id ?? null;
+
   useEffect(() => {
-    if (!isAuthenticated || !trip?.id) return;
+    if (!isAuthenticated || !activeTripId) return;
 
     const channel = supabase
-      .channel(`trip-members-${trip.id}`)
+      .channel(`trip-members-${activeTripId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'trip_members',
-          filter: `trip_id=eq.${trip.id}`,
+          filter: `trip_id=eq.${activeTripId}`,
         },
         () => {
-          // Debounce refetch to avoid race conditions
-          fetchTrip();
+          debouncedRefetch();
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [isAuthenticated, trip?.id, fetchTrip]);
+  }, [isAuthenticated, activeTripId, debouncedRefetch]);
 
   useEffect(() => {
     if (isAuthenticated) {
