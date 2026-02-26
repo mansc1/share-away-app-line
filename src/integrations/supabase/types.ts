@@ -145,6 +145,144 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_invites: {
+        Row: {
+          created_at: string | null
+          created_by_user_id: string
+          id: string
+          status: string
+          token: string
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by_user_id: string
+          id?: string
+          status?: string
+          token: string
+          trip_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by_user_id?: string
+          id?: string
+          status?: string
+          token?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_invites_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_members: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          display_name_norm: string
+          id: string
+          joined_at: string | null
+          role: string
+          trip_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          display_name_norm: string
+          id?: string
+          joined_at?: string | null
+          role: string
+          trip_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          display_name_norm?: string
+          id?: string
+          joined_at?: string | null
+          role?: string
+          trip_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_members_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          capacity_total: number
+          confirmed_at: string | null
+          created_at: string | null
+          created_by_user_id: string
+          end_date: string
+          id: string
+          name: string
+          start_date: string
+          status: string
+        }
+        Insert: {
+          capacity_total: number
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by_user_id: string
+          end_date: string
+          id?: string
+          name: string
+          start_date: string
+          status?: string
+        }
+        Update: {
+          capacity_total?: number
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by_user_id?: string
+          end_date?: string
+          id?: string
+          name?: string
+          start_date?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      user_active_trip: {
+        Row: {
+          trip_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          trip_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          trip_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_active_trip_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
