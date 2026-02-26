@@ -1,17 +1,19 @@
 
 
-## Plan: Smart post-login routing based on active trip
+## Plan: ลบ active trip ของทั้ง 2 users เพื่อทดสอบ routing
 
-### Change: `src/pages/LineCallbackPage.tsx`
+### Step 1: ลบข้อมูลใน `user_active_trip`
 
-After successful token exchange (line 53), replace the current redirect logic (lines 54-56) with:
+Execute SQL via database tool:
 
-1. Read and immediately remove `post_login_redirect` from localStorage
-2. If a redirect path exists → navigate there directly (unchanged behavior)
-3. If no redirect path → call `get-active-trip` with the new session token
-   - If trip exists → navigate to `/app`
-   - If no trip → navigate to `/trip/new`
-   - If fetch fails → fallback to `/app`
+```sql
+DELETE FROM user_active_trip 
+WHERE user_id IN ('aa154f14-e02a-4083-ab7b-dab1e581d89b', 'dfdcfb0e-f33d-4912-b8ea-4a757ba60004');
+```
 
-All within the existing `exchange` async function, no new components or hooks needed. Single trip check, no loop risk.
+### Step 2: ทดสอบ
+
+Login ผ่าน LINE → ระบบจะเรียก `get-active-trip` → ได้ `trip: null` → redirect ไป `/trip/new`
+
+No code changes needed. Database operation only.
 
