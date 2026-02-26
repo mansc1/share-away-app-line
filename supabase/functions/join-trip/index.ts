@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       return json({ error: "Trip not found" }, 404);
     }
 
-    if (trip.status !== "open") {
+    if (trip.status !== "open" && trip.status !== "confirmed") {
       return json({ error: "This trip is no longer accepting members" }, 409);
     }
 
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
       .eq("trip_id", trip.id);
 
     if (count !== null && count >= trip.capacity_total) {
-      return json({ error: "Trip is full" }, 409);
+      return json({ code: "trip_full", error: "Trip is full" }, 400);
     }
 
     // Add member
@@ -138,8 +138,7 @@ Deno.serve(async (req) => {
     if (memberErr) {
       console.error("Member insert error:", memberErr);
       if (memberErr.code === "23505") {
-        // Unique constraint violation (display_name_norm duplicate)
-        return json({ error: "A member with a similar name already exists in this trip" }, 409);
+        return json({ code: "duplicate_name", error: "A member with a similar name already exists in this trip" }, 409);
       }
       return json({ error: "Failed to join trip" }, 500);
     }

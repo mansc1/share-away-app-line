@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.update-member-name]
 verify_jwt = false
+
+[functions.add-capacity]
+verify_jwt = false
