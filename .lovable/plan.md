@@ -1,38 +1,77 @@
 
 
-## Plan: Debug LINE Login — Better Error Reporting
+## Final Migration SQL — Trip Registration Schema
 
-### Problem
-The `auth-line-callback` edge function returns generic `internal_error` messages. The logs show `No matching key found in LINE JWKS` errors, but the frontend only displays "Login failed: internal_error" with no actionable details.
+Two additions applied:
+1. `created_at timestamptz DEFAULT now()` added to `trip_members`
+2. `CHECK (length(trim(name)) > 0)` added to `trips.name`
 
-### Changes
+```sql
+-- trips
+CREATE TABLE public.trips (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL CHECK (length(trim(name)) > 0),
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  capacity_total int NOT NULL CHECK (capacity_total >= 2),
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','confirmed','archived')),
+  created_by_user_id text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  confirmed_at timestamptz NULL,
+  CHECK (end_date >= start_date)
+);
 
-#### 1. Edge Function: `supabase/functions/auth-line-callback/index.ts`
+-- trip_members
+CREATE TABLE public.trip_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id uuid NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
+  user_id text NOT NULL,
+  display_name text NOT NULL CHECK (length(trim(display_name)) > 0),
+  display_name_norm text NOT NULL,
+  role text NOT NULL CHECK (role IN ('admin','member')),
+  joined_at timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (trip_id, user_id),
+  UNIQUE (trip_id, display_name_norm)
+);
 
-**Improve error handling in token exchange (around line 107-120):**
-- When `tokenRes` fails, parse the response as JSON and return `line_status`, `line_error`, `line_error_description`, and `redirect_uri_used` in the error response.
+-- trip_invites
+CREATE TABLE public.trip_invites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id uuid NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
+  token text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  created_by_user_id text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
 
-**Improve error handling in id_token verification (around line 134):**
-- Wrap `verifyIdToken()` call in its own try/catch.
-- Return the specific error message (e.g., "No matching key found in LINE JWKS") in the response JSON.
+-- user_active_trip
+CREATE TABLE public.user_active_trip (
+  user_id text PRIMARY KEY,
+  trip_id uuid NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
+  updated_at timestamptz DEFAULT now()
+);
 
-**Improve the outer catch block (around line 172-177):**
-- Return `err.message` in the response instead of just `"internal_error"`.
+-- Normalization trigger
+CREATE OR REPLACE FUNCTION public.normalize_display_name()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.display_name_norm := lower(trim(regexp_replace(NEW.display_name, '\s+', ' ', 'g')));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-**Log the redirect_uri being used** for debugging.
+CREATE TRIGGER trg_normalize_display_name
+  BEFORE INSERT OR UPDATE ON public.trip_members
+  FOR EACH ROW
+  EXECUTE FUNCTION public.normalize_display_name();
 
-#### 2. Frontend: `src/pages/LineCallbackPage.tsx`
+-- RLS (no public policies — service role only)
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_active_trip ENABLE ROW LEVEL SECURITY;
+```
 
-**Enhance error display (around line 37-39):**
-- When the edge function returns error JSON with `details`, parse and display all fields: `line_status`, `line_error`, `line_error_description`, `redirect_uri_used`, and `message`.
-- Show a more detailed error card instead of just the error code string.
-
-### Technical Details
-
-The key error from logs is `No matching key found in LINE JWKS` — this means the JWT `kid` header doesn't match any key from `https://api.line.me/oauth2/v2.1/certs`. This could indicate:
-- LINE rotated their JWKS keys between the token being issued and verification
-- A caching issue
-- The id_token's `kid` is using a different algorithm
-
-The improved error reporting will surface the exact failure point so we can diagnose further.
+All existing constraints preserved. Ready to execute on your confirmation.
 
