@@ -1,46 +1,97 @@
 
 
-## End-to-End Verification Report
+## Verification Checklist for /trip/new
 
-### Test Results Summary
+Base URL: `https://share-away-app-line.lovable.app`
 
-| # | Test | Result | Details |
-|---|------|--------|---------|
-| 1 | Create trip as admin | PASS | `POST /create-trip` → 201, trip_id returned |
-| 2 | Generate invite link | PASS | `POST /generate-invite-link` → 201, token + URL returned |
-| 3 | get-invite-info (valid token) | PASS | Returns trip name, dates, admin_name, member_count=1, is_full=false, capacity_total=3 |
-| 4 | get-invite-info (invalid token) | PASS | 404 `{ code: "invalid_invite" }` |
-| 5 | JoinTripPage — trip info before login | PASS | Shows trip name, dates (28 ก.พ. 69 – 4 มี.ค. 69), "1/3 คน", admin name, LINE login button |
-| 6 | JoinTripPage — invalid token | PASS | Shows "ลิงก์เชิญไม่ถูกต้อง" with "กลับหน้าหลัก" link |
-| 7 | join-trip (2nd user) | PASS | 201, `already_member: false` |
-| 8 | join-trip (duplicate) | PASS | 200, `already_member: true` — no error, sets active trip |
-| 9 | add-capacity (negative/zero) | PASS | 400 `{ code: "bad_request" }` |
-| 10 | add-capacity (non-admin) | PASS | 403 `{ code: "forbidden" }` |
-| 11 | add-capacity (valid, admin) | PASS | 200, capacity 3→5 |
-| 12 | get-invite-info after add-capacity | PASS | member_count=2, capacity_total=5, is_full=false |
-| 13 | confirm-trip (not full) | PASS | 400 `{ code: "capacity_not_full" }` with Thai message |
-| 14 | rename while open | PASS | 200, display_name updated |
-| 15 | rename blocked (code review) | PASS | `update-member-name` checks `trip.status !== "open"` → 400 `{ code: "trip_locked" }` |
+---
 
-### Tests Not Completable (Environment Limitation)
+### Check 1: Unauthenticated Access
 
-| # | Test | Reason |
-|---|------|--------|
-| 5b | Fill trip to capacity | Only 2 LINE users exist in DB; can't create a 3rd via API (no LINE OAuth available in test) |
-| 5c | "ทริปเต็มแล้ว" UI | Requires is_full=true, which requires filling capacity — code review confirms UI renders correctly when `is_full` is true |
-| 7 | Confirm trip | Requires members == capacity_total; can't add 3rd member |
-| 8 | Join after confirm | Depends on step 7 |
-| 9 | Rename blocked after confirm (live test) | Depends on step 7; code logic verified correct |
+**Steps:**
+1. Open incognito or clear `line_session_token` from localStorage
+2. Go to `https://share-away-app-line.lovable.app/trip/new`
 
-### Code Review Verification (for untestable paths)
+**Expected:** Card with "กรุณาเข้าสู่ระบบก่อนสร้างทริป" + LINE login button
 
-- **is_full UI**: `JoinTripPage.tsx` lines render "ทริปเต็มแล้ว" badge + disabled join when `is_full === true` — correct
-- **join-trip capacity check**: Checks `count >= trip.capacity_total` → 400 `{ code: "trip_full" }` — correct
-- **join-trip confirmed status**: Allows `status in ('open', 'confirmed')` — correct
-- **rename after confirm**: `update-member-name` blocks when `trip.status !== 'open'` → 400 `{ code: "trip_locked" }` — correct
-- **get-invite-info archived trip**: Returns 410 `{ code: "trip_closed" }` — correct
+**Network:** No edge function calls (auth check is local via `useLineAuth`)
 
-### Issues Found
+**Known Bug:** After LINE login, user lands on `/app` instead of `/trip/new`. `LineCallbackPage.tsx` line 54 hardcodes `navigate("/app")` and ignores `post_login_redirect` stored by `TripNewPage`. **Fix:** In `LineCallbackPage`, read `post_login_redirect` from localStorage, navigate there, then remove it.
 
-**None.** All tested paths work correctly. The untested paths (capacity-full, confirm, post-confirm flows) are verified correct via code review.
+---
+
+### Check 2: Successful Trip Creation
+
+**Steps:**
+1. Log in first, then go to `/trip/new`
+2. Fill: name="ทดสอบทริป", pick start date (future), end date (after start), capacity=3
+3. Click "สร้างทริป"
+
+**Expected:** Toast "สร้างทริปสำเร็จ!", redirect to `/app`, trip shown as active
+
+**Network:**
+- `POST create-trip` → 201
+- `GET get-active-trip` → 200 (from refetch)
+- `POST get-trip-members` → 200 (from refetch)
+
+---
+
+### Check 3: Date Validation
+
+**Steps:**
+1. On `/trip/new`, pick start date, then manually try to pick end date before start
+
+**Expected:** Calendar disables dates before start date (line 220-222: `disabled={(date) => startDate ? date < startDate : date < new Date()}`). User cannot select invalid end date. If somehow bypassed, submit shows toast "วันกลับต้องไม่ก่อนวันไป" and no API call is made.
+
+**Network:** No `create-trip` call
+
+---
+
+### Check 4: Capacity Validation
+
+**Steps:**
+1. Set capacity to `1`, fill other fields, click submit
+2. Set capacity to `0`, click submit
+
+**Expected:** Toast "จำนวนคนต้องอย่างน้อย 2 คน". No API call. Note: HTML `min={2}` on the input may also prevent typing values below 2 via spinner, but direct typing can bypass it -- the JS validation catches it.
+
+**Network:** No `create-trip` call
+
+---
+
+### Check 5: Active Trip Persistence
+
+**Steps:**
+1. After creating a trip, on `/app`, hard-refresh (Ctrl+R)
+
+**Expected:** `/app` loads, shows the trip. Does not redirect to `/trip/new`.
+
+**Network:** `GET get-active-trip` → 200 with `{ trip: {...} }`
+
+---
+
+### Check 6: Trip Manage Page
+
+**Steps:**
+1. Go to `https://share-away-app-line.lovable.app/trip/manage`
+
+**Expected:** Shows trip name, dates, capacity. Members list shows admin (you) with correct display name.
+
+**Network:**
+- `GET get-active-trip` → 200
+- `POST get-trip-members` → 200
+- Console: no errors
+
+---
+
+### Summary of Issues Found
+
+| # | Status | Issue |
+|---|--------|-------|
+| 1 | BUG | `LineCallbackPage` ignores `post_login_redirect` -- user always lands on `/app` after login instead of returning to `/trip/new` |
+| 2-6 | OK | Code logic is correct |
+
+### Proposed Fix
+
+Add 3 lines to `LineCallbackPage.tsx` after setting the session token (line 53): read `post_login_redirect` from localStorage, navigate to that path (or fall back to `/app`), and remove the key.
 
