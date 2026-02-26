@@ -30,6 +30,8 @@ interface TripContextType {
   noTrip: boolean;
   currentMember: TripMember | null;
   memberNames: string[];
+  isConfirmed: boolean;
+  isAdmin: boolean;
   refetch: () => Promise<void>;
 }
 
@@ -102,9 +104,14 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
     : null;
 
   const memberNames = members.map(m => m.display_name);
+  const isConfirmed = trip?.status === 'confirmed';
+  const isAdmin = currentMember?.role === 'admin';
 
   return (
-    <TripContext.Provider value={{ trip, members, loading, noTrip, currentMember, memberNames, refetch: fetchTrip }}>
+    <TripContext.Provider value={{
+      trip, members, loading, noTrip, currentMember, memberNames,
+      isConfirmed, isAdmin, refetch: fetchTrip,
+    }}>
       {children}
     </TripContext.Provider>
   );
