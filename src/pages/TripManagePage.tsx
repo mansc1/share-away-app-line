@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTrip } from "@/contexts/TripContext";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,25 @@ const TripManagePage = () => {
   const [addCapOpen, setAddCapOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const prevMemberIdsRef = useRef<Set<string>>(new Set());
+  const [newMemberIds, setNewMemberIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentIds = new Set(members.map(m => m.id));
+    const prevIds = prevMemberIdsRef.current;
+    if (prevIds.size > 0) {
+      const added = new Set<string>();
+      currentIds.forEach(id => {
+        if (!prevIds.has(id)) added.add(id);
+      });
+      if (added.size > 0) {
+        setNewMemberIds(added);
+        const timer = setTimeout(() => setNewMemberIds(new Set()), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevMemberIdsRef.current = currentIds;
+  }, [members]);
 
   if (!trip) {
     return (
@@ -103,11 +122,16 @@ const TripManagePage = () => {
           </CardHeader>
           <CardContent className="space-y-2">
             {members.map((m) => (
-              <div key={m.id} className="flex items-center gap-2 py-1.5 border-b last:border-0">
+              <div
+                key={m.id}
+                className={`flex items-center gap-2 py-1.5 border-b last:border-0 transition-all duration-500 ${
+                  newMemberIds.has(m.id) ? "animate-fade-in bg-primary/5" : ""
+                }`}
+              >
                 {m.role === "admin" ? (
                   <Crown className="w-4 h-4 text-amber-500 shrink-0" />
                 ) : (
-                  <User className="w-4 h-4 text-gray-400 shrink-0" />
+                  <User className="w-4 h-4 text-muted-foreground shrink-0" />
                 )}
                 <span className="text-sm flex-1">{m.display_name}</span>
                 {m.role === "admin" && (

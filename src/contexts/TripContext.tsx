@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useLineAuth } from './LineAuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = 'line_session_token';
@@ -90,6 +91,32 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     }
   }, []);
+
+  // Realtime subscription for trip_members
+  useEffect(() => {
+    if (!isAuthenticated || !trip?.id) return;
+
+    const channel = supabase
+      .channel(`trip-members-${trip.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trip_members',
+          filter: `trip_id=eq.${trip.id}`,
+        },
+        () => {
+          // Debounce refetch to avoid race conditions
+          fetchTrip();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, trip?.id, fetchTrip]);
 
   useEffect(() => {
     if (isAuthenticated) {
