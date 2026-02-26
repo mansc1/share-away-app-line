@@ -1,0 +1,89 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+async function authenticateUser(supabase: any, req: Request) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+
+  const sessionToken = authHeader.replace("Bearer ", "");
+  const { data: session } = await supabase
+    .from("line_sessions")
+    .select("user_id, expires_at")
+    .eq("session_token", sessionToken)
+    .single();
+
+  if (!session) return null;
+  if (new Date(session.expires_at) < new Date()) {
+    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
+    return null;
+  }
+
+  return { id: session.user_id };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return json({ code: "method_not_allowed", message: "Method not allowed" }, 405);
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const user = await authenticateUser(supabase, req);
+    if (!user) return json({ code: "unauthorized", message: "Not authenticated" }, 403);
+
+    const body = await req.json();
+    const { trip_id } = body;
+
+    if (!trip_id) {
+      return json({ code: "bad_request", message: "trip_id is required" }, 400);
+    }
+
+    // Verify caller is a member
+    const { data: membership } = await supabase
+      .from("trip_members")
+      .select("id")
+      .eq("trip_id", trip_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!membership) {
+      return json({ code: "forbidden", message: "You are not a member of this trip" }, 403);
+    }
+
+    const { data: members, error: membersErr } = await supabase
+      .from("trip_members")
+      .select("id, user_id, display_name, role, joined_at")
+      .eq("trip_id", trip_id)
+      .order("role", { ascending: false })
+      .order("joined_at", { ascending: true });
+
+    if (membersErr) {
+      console.error("get-trip-members query error:", membersErr);
+      return json({ code: "internal_error", message: "Failed to fetch members" }, 500);
+    }
+
+    return json({ members: members ?? [] });
+  } catch (err) {
+    console.error("get-trip-members error:", err);
+    return json({ code: "internal_error", message: "Internal error" }, 500);
+  }
+});
