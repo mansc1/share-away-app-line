@@ -51,7 +51,9 @@ const LineCallbackPage = () => {
         }
 
         localStorage.setItem(SESSION_KEY, data.session_token);
-        navigate("/app", { replace: true });
+        const redirect = localStorage.getItem("post_login_redirect") || "/app";
+        localStorage.removeItem("post_login_redirect");
+        navigate(redirect, { replace: true });
       } catch {
         setError({ error: "network_error" });
       }
