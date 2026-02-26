@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.auth-logout]
 verify_jwt = false
+
+[functions.create-trip]
+verify_jwt = false
+
+[functions.join-trip]
+verify_jwt = false
+
+[functions.generate-invite-link]
+verify_jwt = false
