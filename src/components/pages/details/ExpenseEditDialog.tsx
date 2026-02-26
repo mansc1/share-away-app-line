@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Expense } from "@/types/expense";
-import { PEOPLE, DATES, CATEGORIES } from "@/types/form";
+import { DATES, CATEGORIES } from "@/types/form";
 import { useToast } from "@/components/ui/use-toast";
+import { useTrip } from "@/contexts/TripContext";
 import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 
@@ -22,6 +23,7 @@ interface ExpenseEditDialogProps {
 const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDialogProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { memberNames } = useTrip();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
@@ -152,7 +154,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
     const hasSelection = formData.sharedBy.length > 0;
     setFormData(prev => ({
       ...prev,
-      sharedBy: hasSelection ? [] : [...PEOPLE]
+      sharedBy: hasSelection ? [] : [...memberNames]
     }));
   };
 
@@ -240,7 +242,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
                   <SelectValue placeholder="เลือกคน" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PEOPLE.map(person => (
+                  {memberNames.map(person => (
                     <SelectItem key={person} value={person} className="text-sm">{person}</SelectItem>
                   ))}
                 </SelectContent>
@@ -275,7 +277,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
               <PeopleToggleButton hasSelection={hasSelection} onToggleAll={handleToggleAll} />
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {PEOPLE.map(person => (
+              {memberNames.map(person => (
                 <div key={person} className="flex items-center space-x-2">
                   <Checkbox
                     id={`edit-${person}`}

@@ -1,6 +1,6 @@
 
 import { Expense, PersonBalance } from "@/types/expense";
-import { PEOPLE } from "@/types/form";
+import { useTrip } from "@/contexts/TripContext";
 import ExpenseChart from "@/components/ExpenseChart";
 import BalanceChart from "@/components/BalanceChart";
 import AddExpenseForm from "@/components/AddExpenseForm";
@@ -14,11 +14,12 @@ interface MainPageProps {
 }
 
 const MainPage = ({ expenses, onAddExpense, addExpenseOpen, onAddExpenseOpenChange }: MainPageProps) => {
+  const { memberNames } = useTrip();
+
   const calculateBalances = (): PersonBalance[] => {
     const balances: { [key: string]: number } = {};
     
-    // Initialize all people with 0 balance
-    PEOPLE.forEach(person => {
+    memberNames.forEach(person => {
       balances[person] = 0;
     });
 

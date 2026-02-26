@@ -1,8 +1,10 @@
 
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { useExpenses } from "@/hooks/useExpenses";
+import { useTrip } from "@/contexts/TripContext";
 import AppHeader from "./AppHeader";
 import BottomNavigation from "./BottomNavigation";
 import MainPage from "./pages/MainPage";
@@ -13,6 +15,7 @@ import ChatbotPage from "./pages/ChatbotPage";
 const ExpenseApp = () => {
   const [currentPage, setCurrentPage] = useState('main');
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const { trip, loading: tripLoading, noTrip } = useTrip();
   const { 
     expenses, 
     loading, 
@@ -25,7 +28,7 @@ const ExpenseApp = () => {
   console.log('ExpenseApp - Current expenses:', expenses);
   console.log('ExpenseApp - Loading state:', loading);
 
-  if (loading) {
+  if (loading || tripLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -34,6 +37,10 @@ const ExpenseApp = () => {
         </div>
       </div>
     );
+  }
+
+  if (noTrip) {
+    return <Navigate to="/trip/new" replace />;
   }
 
   const renderCurrentPage = () => {
