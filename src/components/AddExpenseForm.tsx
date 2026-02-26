@@ -8,8 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { Expense } from "@/types/expense";
-import { ExpenseFormData, PEOPLE, DATES, CATEGORIES } from "@/types/form";
+import { ExpenseFormData, DATES, CATEGORIES } from "@/types/form";
 import { useToast } from "@/components/ui/use-toast";
+import { useTrip } from "@/contexts/TripContext";
 import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 
@@ -25,13 +26,14 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
   const setIsOpen = onOpenChange || setInternalOpen;
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { members, currentMember, memberNames } = useTrip();
   const [formData, setFormData] = useState<ExpenseFormData>({
     name: '',
     date: '',
     time: '',
     category: '',
     amount: '',
-    paidBy: '',
+    paidBy: currentMember?.display_name || '',
     sharedBy: []
   });
 
@@ -131,7 +133,7 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
     const hasSelection = formData.sharedBy.length > 0;
     setFormData(prev => ({
       ...prev,
-      sharedBy: hasSelection ? [] : [...PEOPLE]
+      sharedBy: hasSelection ? [] : [...memberNames]
     }));
   };
 
@@ -225,7 +227,7 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
                   <SelectValue placeholder="เลือกคน" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PEOPLE.map(person => (
+                  {memberNames.map(person => (
                     <SelectItem key={person} value={person} className="text-sm">{person}</SelectItem>
                   ))}
                 </SelectContent>
@@ -239,7 +241,7 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
               <PeopleToggleButton hasSelection={hasSelection} onToggleAll={handleToggleAll} />
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {PEOPLE.map(person => (
+              {memberNames.map(person => (
                 <div key={person} className="flex items-center space-x-2">
                   <Checkbox
                     id={person}

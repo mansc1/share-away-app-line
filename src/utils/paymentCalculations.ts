@@ -1,6 +1,5 @@
 
 import { Expense, PaymentSummary } from "@/types/expense";
-import { PEOPLE } from "@/constants/people";
 
 export interface GroupedPayment {
   from: string;
@@ -8,11 +7,14 @@ export interface GroupedPayment {
   totalAmount: number;
 }
 
-export const calculateOptimalPayments = (expenses: Expense[]): PaymentSummary[] => {
+export const calculateOptimalPayments = (expenses: Expense[], people?: string[]): PaymentSummary[] => {
   // Calculate individual balances
   const balances: { [key: string]: number } = {};
   
-  PEOPLE.forEach(person => {
+  // Derive people from expenses if not provided
+  const memberList = people ?? [...new Set(expenses.flatMap(e => [e.paidBy, ...e.sharedBy]))];
+  
+  memberList.forEach(person => {
     balances[person] = 0;
   });
 
