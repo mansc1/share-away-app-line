@@ -99,8 +99,17 @@ const LineCallbackPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <p className="text-muted-foreground">Logging in...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-6">
+      {/* Animated rings */}
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" />
+        <div className="absolute inset-1.5 rounded-full border-4 border-transparent border-b-primary/60 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+      </div>
+      <div className="flex flex-col items-center gap-1.5 animate-fade-in">
+        <p className="text-base font-medium text-foreground">กำลังเข้าสู่ระบบ</p>
+        <p className="text-sm text-muted-foreground">กรุณารอสักครู่...</p>
+      </div>
     </div>
   );
 };
