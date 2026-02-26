@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.generate-invite-link]
 verify_jwt = false
+
+[functions.get-active-trip]
+verify_jwt = false
+
+[functions.get-trip-members]
+verify_jwt = false
