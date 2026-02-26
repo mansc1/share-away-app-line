@@ -51,9 +51,24 @@ const LineCallbackPage = () => {
         }
 
         localStorage.setItem(SESSION_KEY, data.session_token);
-        const redirect = localStorage.getItem("post_login_redirect") || "/app";
+        const redirect = localStorage.getItem("post_login_redirect");
         localStorage.removeItem("post_login_redirect");
-        navigate(redirect, { replace: true });
+
+        if (redirect) {
+          navigate(redirect, { replace: true });
+          return;
+        }
+
+        // No explicit redirect — check active trip to decide destination
+        try {
+          const tripRes = await fetch(`${SUPABASE_URL}/functions/v1/get-active-trip`, {
+            headers: { Authorization: `Bearer ${data.session_token}` },
+          });
+          const tripData = await tripRes.json();
+          navigate(tripData?.trip ? "/app" : "/trip/new", { replace: true });
+        } catch {
+          navigate("/app", { replace: true });
+        }
       } catch {
         setError({ error: "network_error" });
       }
