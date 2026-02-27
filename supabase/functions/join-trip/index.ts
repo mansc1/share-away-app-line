@@ -147,6 +147,24 @@ Deno.serve(async (req) => {
       return json({ error: "Failed to join trip" }, 500);
     }
 
+    // Auto-revoke invites if trip is now full
+    const { count: newCount } = await supabase
+      .from("trip_members")
+      .select("id", { count: "exact", head: true })
+      .eq("trip_id", trip.id);
+
+    if (newCount !== null && newCount >= trip.capacity_total) {
+      await supabase
+        .from("trip_invites")
+        .update({
+          status: "revoked",
+          revoked_at: new Date().toISOString(),
+          revoked_reason: "capacity_full",
+        })
+        .eq("trip_id", trip.id)
+        .eq("status", "active");
+    }
+
     // Set as active trip
     await supabase
       .from("user_active_trip")
