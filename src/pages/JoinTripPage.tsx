@@ -148,6 +148,7 @@ const JoinTripPage = () => {
     const errorMessages: Record<string, { title: string; desc: string }> = {
       invalid_invite: { title: "ลิงก์เชิญไม่ถูกต้อง", desc: "ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว" },
       invite_revoked: { title: "ลิงก์เชิญถูกยกเลิก", desc: "ลิงก์เชิญนี้ถูกยกเลิกแล้ว" },
+      invite_closed: { title: "ทริปเต็มแล้ว", desc: "ทริปนี้เต็มแล้ว ไม่สามารถเข้าร่วมได้" },
       trip_closed: { title: "ทริปนี้ปิดแล้ว", desc: "ทริปนี้ปิดรับสมาชิกแล้ว" },
     };
     const err = errorMessages[inviteError] || errorMessages.invalid_invite;
