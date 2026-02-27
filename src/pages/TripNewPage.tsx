@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import OnboardQRModal from "@/components/trip/OnboardQRModal";
 import { format, addDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { CalendarIcon, ArrowLeft, Loader2, Users, Plane } from "lucide-react";
@@ -34,6 +35,7 @@ const TripNewPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +88,7 @@ const TripNewPage = () => {
 
       toast({ title: "สร้างทริปสำเร็จ!", description: trimmedName });
       await refetch();
-      navigate("/app");
+      setQrModalOpen(true);
     } catch {
       toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
     } finally {
@@ -263,6 +265,14 @@ const TripNewPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      <OnboardQRModal
+        open={qrModalOpen}
+        onOpenChange={(v) => {
+          setQrModalOpen(v);
+          if (!v) navigate("/app");
+        }}
+      />
     </div>
   );
 };
