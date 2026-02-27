@@ -1,34 +1,29 @@
 
 
-## Implementation Plan: LINE Avatar in PaymentCard
+## Plan: Extract PersonAvatar + Add to ExpenseCard
 
-### Step 1: Update `get-trip-members` edge function
-**File:** `supabase/functions/get-trip-members/index.ts`
+### Step 1: Create `src/components/shared/PersonAvatar.tsx`
+Extract from `PaymentCard.tsx` into a shared component with size prop (`sm`/`md`/`lg` mapping to w-6/w-8/w-12), `name`, and optional `className`. Uses `useTrip().getAvatarForName`, `useState` for error fallback, emoji via `getPersonAvatar`.
 
-- After fetching `trip_members`, collect all `user_id` values
-- If list is non-empty, query `line_users` selecting only `line_sub, avatar_url` where `line_sub` is in the user_id list
-- Merge `avatar_url` into each member by matching `user_id === line_sub`
-- If list is empty, skip query and return members with `avatar_url: null`
+### Step 2: Update `src/components/PaymentCard.tsx`
+- Remove inline `PersonAvatar` and `PersonAvatarProps` interface (lines ~14-41)
+- Import from `@/components/shared/PersonAvatar`
+- Map existing usage: `sizeClass="w-12 h-12"` → `size="lg"`, `sizeClass="w-8 h-8"` → `size="md"`
 
-### Step 2: Update `TripContext`
-**File:** `src/contexts/TripContext.tsx`
+### Step 3: Update `src/components/pages/details/ExpenseCard.tsx`
+- Import `PersonAvatar` from shared
+- Replace the "จ่ายโดย" section (around line 119-123) with right-aligned layout showing name + avatar below:
+```
+<div className="text-right">
+  <div className="text-xs text-gray-500">จ่ายโดย {expense.paidBy}</div>
+  <div className="mt-1 flex justify-end">
+    <PersonAvatar name={expense.paidBy} size="sm" />
+  </div>
+</div>
+```
 
-- Add `avatar_url?: string | null` to `TripMember` interface
-- Add `getAvatarForName` to `TripContextType`
-- Add `normalizeDisplayName()` helper: `name.trim().toLowerCase().replace(/\s+/g, " ")`
-- Build `memberAvatarsNorm` map via `useMemo`: normalized display_name → avatar_url
-- Expose `getAvatarForName(name)` via context
-
-### Step 3: Update `PaymentCard`
-**File:** `src/components/PaymentCard.tsx`
-
-- Add `PersonAvatar` component with `useState` for image error fallback
-- Uses `useTrip().getAvatarForName(name)` for lookup
-- Renders `<img>` with `loading="lazy"`, `referrerPolicy="no-referrer"`, `onError` → sets failed state → falls back to existing emoji avatar
-- Replace both "from" avatar (w-12 h-12) and "to" avatar (w-8 h-8) with `PersonAvatar`, passing appropriate size class
-
-### Files modified
-1. `supabase/functions/get-trip-members/index.ts`
-2. `src/contexts/TripContext.tsx`
-3. `src/components/PaymentCard.tsx`
+### Files
+1. `src/components/shared/PersonAvatar.tsx` (new)
+2. `src/components/PaymentCard.tsx` (remove inline, import shared)
+3. `src/components/pages/details/ExpenseCard.tsx` (add avatar below payer name)
 
