@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     // Look up invite
     const { data: invite, error: inviteErr } = await supabase
       .from("trip_invites")
-      .select("id, trip_id, status")
+      .select("id, trip_id, status, revoked_reason")
       .eq("token", token)
       .single();
 
@@ -45,7 +45,10 @@ Deno.serve(async (req) => {
     }
 
     if (invite.status !== "active") {
-      return json({ code: "invite_revoked", error: "Invite has been revoked" }, 410);
+      if (invite.revoked_reason === "capacity_full") {
+        return json({ code: "invite_closed", message: "ทริปเต็มแล้ว" }, 410);
+      }
+      return json({ code: "invite_revoked", message: "ลิงก์ถูกปิดใช้งานแล้ว" }, 410);
     }
 
     // Fetch trip
@@ -59,8 +62,8 @@ Deno.serve(async (req) => {
       return json({ code: "invalid_invite", error: "Trip not found" }, 404);
     }
 
-    if (trip.status === "archived") {
-      return json({ code: "trip_closed", message: "Trip is closed" }, 410);
+    if (trip.status === "archived" || trip.status === "cancelled") {
+      return json({ code: "trip_closed", message: "ทริปนี้ปิดแล้ว" }, 410);
     }
 
     // Count members
