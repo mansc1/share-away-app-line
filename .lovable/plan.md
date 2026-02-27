@@ -1,35 +1,56 @@
 
 
-## Plan: OnboardQRModal with auto-generate invite and realtime counter
+## Plan: Calendar popover + reset to trip.start_date on open
 
-### Step 1: Create `src/components/trip/OnboardQRModal.tsx`
+### File: `src/components/AddExpenseForm.tsx`
 
-New component — fullscreen Dialog with:
-- **Props**: `open`, `onOpenChange`
-- **Auto-generate**: On `open=true`, call `generate-invite-link` once using a `useRef` guard. Reset guard + state when modal closes.
-- **Trip info**: Name as `DialogTitle`, Thai-formatted date range below
-- **Realtime counter**: `members.length / trip.capacity_total` from `useTrip()` — no new subscription
-- **QR code**: `QRCodeSVG` size 220, wrapped in white rounded container
-- **Buttons**: Copy link + LINE share (logic reused from `InviteShareSection`)
-- **Full capacity**: "เต็มแล้ว" destructive Badge, QR gets `opacity-40`, copy/share buttons disabled. Modal stays open.
+**Imports to add:**
+- `useEffect` from react
+- `Calendar` from `@/components/ui/calendar`
+- `Popover`, `PopoverContent`, `PopoverTrigger` from `@/components/ui/popover`
+- `CalendarIcon` from `lucide-react`
+- `format`, `parseISO` from `date-fns`
+- `th` from `date-fns/locale/th`
+- `cn` from `@/lib/utils`
 
-### Step 2: Edit `src/pages/TripNewPage.tsx`
+**Remove:** `DATES` from imports (no longer needed), `Select`-related imports for date field
 
-- Add `qrModalOpen` state
-- After `create-trip` succeeds: `await refetch()`, then `setQrModalOpen(true)` instead of `navigate("/app")`
-- On modal close: `navigate("/app")`
-- Render `<OnboardQRModal open={qrModalOpen} onOpenChange={...} />`
+**Changes:**
 
-### Step 3: Edit `src/pages/TripManagePage.tsx`
+1. Add `selectedDate` local state: `const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)`
 
-- Add `qrModalOpen` state
-- Add admin-only `<Button>` with `QrCode` icon labeled "เปิด QR ลงทะเบียน" (visible when trip status is `open` or `confirmed`)
-- Render `<OnboardQRModal open={qrModalOpen} onOpenChange={setQrModalOpen} />`
+2. Get `trip` from `useTrip()` (already imported, just destructure `trip` alongside existing fields)
 
-### Files changed
-| Action | File |
-|--------|------|
-| New | `src/components/trip/OnboardQRModal.tsx` |
-| Edit | `src/pages/TripNewPage.tsx` |
-| Edit | `src/pages/TripManagePage.tsx` |
+3. Compute `minDate`/`maxDate` from `trip.start_date`/`trip.end_date` with fallback
+
+4. Add `useEffect` to reset date on modal open:
+   ```ts
+   useEffect(() => {
+     if (!isOpen) return;
+     if (trip?.start_date) {
+       setSelectedDate(parseISO(trip.start_date));
+     } else {
+       setSelectedDate(undefined);
+     }
+   }, [isOpen, trip?.start_date]);
+   ```
+
+5. Replace date `Select` dropdown (lines 168-180) with `Popover > Button > Calendar`:
+   - Button shows `format(selectedDate, "d MMM yyyy", { locale: th })` or placeholder "เลือกวันที่"
+   - Calendar: `mode="single"`, `selected={selectedDate}`, `disabled` outside trip range, `pointer-events-auto`
+   - On select: set `selectedDate`, close popover
+
+6. Update `formData.date` sync: when `selectedDate` changes, set `formData.date` to the Thai shorthand format (matching current DB format, e.g. `"27 ก.พ."`) using `format(selectedDate, "d MMM", { locale: th })` + `.` — keeping backward compatibility with existing data
+
+7. Update `validateForm`: check `selectedDate` instead of `formData.date` string
+
+8. Update `handleSubmit`: derive `date` from `selectedDate` in the same Thai format
+
+9. Add helper text under the date field: "เลือกได้เฉพาะวันที่ในทริป"
+
+10. On form reset after successful submit, also reset `selectedDate` to undefined (it will be re-set by the useEffect on next open)
+
+### No other files changed
+- DB format stays as Thai text (per user's earlier decision to keep format)
+- `ExpenseEditDialog` not touched in this task (separate request)
 
