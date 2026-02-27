@@ -59,6 +59,16 @@ export const useExpenses = () => {
   const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
     if (!activeTripId) return;
 
+    const tripStatus = trip?.status;
+    if (tripStatus === 'archived' || tripStatus === 'cancelled') {
+      toast({
+        title: "ไม่สามารถเพิ่มรายจ่ายได้",
+        description: "ทริปนี้ถูกปิดแล้ว",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const insertData = {
         trip_id: activeTripId,
