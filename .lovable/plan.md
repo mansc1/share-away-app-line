@@ -1,39 +1,35 @@
 
 
-## Plan: Add migration + auto-revoke in join-trip
+## Plan: OnboardQRModal with auto-generate invite and realtime counter
 
-### Step 1: Database Migration
-Add two columns to `trip_invites`:
-```sql
-ALTER TABLE public.trip_invites
-  ADD COLUMN IF NOT EXISTS revoked_at timestamptz,
-  ADD COLUMN IF NOT EXISTS revoked_reason text;
-```
+### Step 1: Create `src/components/trip/OnboardQRModal.tsx`
 
-### Step 2: Update `join-trip` Edge Function
-After the successful member insert (line ~145), add auto-revoke logic:
-1. Re-count members for the trip
-2. If `count >= trip.capacity_total`, bulk-revoke all active invites:
-```typescript
-const { count: newCount } = await supabase
-  .from("trip_members")
-  .select("id", { count: "exact", head: true })
-  .eq("trip_id", trip.id);
+New component — fullscreen Dialog with:
+- **Props**: `open`, `onOpenChange`
+- **Auto-generate**: On `open=true`, call `generate-invite-link` once using a `useRef` guard. Reset guard + state when modal closes.
+- **Trip info**: Name as `DialogTitle`, Thai-formatted date range below
+- **Realtime counter**: `members.length / trip.capacity_total` from `useTrip()` — no new subscription
+- **QR code**: `QRCodeSVG` size 220, wrapped in white rounded container
+- **Buttons**: Copy link + LINE share (logic reused from `InviteShareSection`)
+- **Full capacity**: "เต็มแล้ว" destructive Badge, QR gets `opacity-40`, copy/share buttons disabled. Modal stays open.
 
-if (newCount !== null && newCount >= trip.capacity_total) {
-  await supabase
-    .from("trip_invites")
-    .update({
-      status: "revoked",
-      revoked_at: new Date().toISOString(),
-      revoked_reason: "capacity_full",
-    })
-    .eq("trip_id", trip.id)
-    .eq("status", "active");
-}
-```
+### Step 2: Edit `src/pages/TripNewPage.tsx`
+
+- Add `qrModalOpen` state
+- After `create-trip` succeeds: `await refetch()`, then `setQrModalOpen(true)` instead of `navigate("/app")`
+- On modal close: `navigate("/app")`
+- Render `<OnboardQRModal open={qrModalOpen} onOpenChange={...} />`
+
+### Step 3: Edit `src/pages/TripManagePage.tsx`
+
+- Add `qrModalOpen` state
+- Add admin-only `<Button>` with `QrCode` icon labeled "เปิด QR ลงทะเบียน" (visible when trip status is `open` or `confirmed`)
+- Render `<OnboardQRModal open={qrModalOpen} onOpenChange={setQrModalOpen} />`
 
 ### Files changed
-- **Migration**: 1 SQL file (add `revoked_at`, `revoked_reason` to `trip_invites`)
-- **Edge Function**: `supabase/functions/join-trip/index.ts` — add ~12 lines after member insert
+| Action | File |
+|--------|------|
+| New | `src/components/trip/OnboardQRModal.tsx` |
+| Edit | `src/pages/TripNewPage.tsx` |
+| Edit | `src/pages/TripManagePage.tsx` |
 
