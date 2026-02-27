@@ -5,10 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Crown, User, CheckCircle2, UserPlus } from "lucide-react";
+import { ArrowLeft, Crown, User, CheckCircle2, UserPlus, QrCode } from "lucide-react";
 import MemberNameEditor from "@/components/trip/MemberNameEditor";
 import AddCapacityDialog from "@/components/trip/AddCapacityDialog";
 import InviteShareSection from "@/components/trip/InviteShareSection";
+import OnboardQRModal from "@/components/trip/OnboardQRModal";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = 'line_session_token';
@@ -17,6 +18,7 @@ const TripManagePage = () => {
   const { trip, members, isAdmin, isConfirmed, refetch } = useTrip();
   const [confirming, setConfirming] = useState(false);
   const [addCapOpen, setAddCapOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const prevMemberIdsRef = useRef<Set<string>>(new Set());
@@ -142,6 +144,14 @@ const TripManagePage = () => {
           </CardContent>
         </Card>
 
+        {/* QR onboard button (admin only, open or confirmed) */}
+        {isAdmin && (trip.status === "open" || trip.status === "confirmed") && (
+          <Button variant="outline" className="w-full" onClick={() => setQrModalOpen(true)}>
+            <QrCode className="w-4 h-4 mr-2" />
+            เปิด QR ลงทะเบียน
+          </Button>
+        )}
+
         {/* Invite share (admin only, trip open) */}
         {isAdmin && !isConfirmed && <InviteShareSection />}
 
@@ -178,6 +188,7 @@ const TripManagePage = () => {
         )}
 
         <AddCapacityDialog open={addCapOpen} onOpenChange={setAddCapOpen} />
+        <OnboardQRModal open={qrModalOpen} onOpenChange={setQrModalOpen} />
       </div>
     </div>
   );
