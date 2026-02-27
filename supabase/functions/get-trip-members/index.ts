@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
     const { data: members, error: membersErr } = await supabase
       .from("trip_members")
-      .select("id, user_id, display_name, role, joined_at")
+      .select("id, user_id, display_name, display_name_norm, role, joined_at")
       .eq("trip_id", trip_id)
       .order("role", { ascending: false })
       .order("joined_at", { ascending: true });
@@ -81,7 +81,35 @@ Deno.serve(async (req) => {
       return json({ code: "internal_error", message: "Failed to fetch members" }, 500);
     }
 
-    return json({ members: members ?? [] });
+    const memberList = members ?? [];
+
+    // Collect user_ids and fetch avatars from line_users
+    const userIds = memberList.map((m: any) => m.user_id).filter(Boolean);
+
+    let avatarMap: Record<string, string> = {};
+
+    if (userIds.length > 0) {
+      const { data: lineUsers } = await supabase
+        .from("line_users")
+        .select("line_sub, avatar_url")
+        .in("line_sub", userIds);
+
+      if (lineUsers) {
+        for (const lu of lineUsers) {
+          if (lu.avatar_url) {
+            avatarMap[lu.line_sub] = lu.avatar_url;
+          }
+        }
+      }
+    }
+
+    // Merge avatar_url into members
+    const enriched = memberList.map((m: any) => ({
+      ...m,
+      avatar_url: avatarMap[m.user_id] || null,
+    }));
+
+    return json({ members: enriched });
   } catch (err) {
     console.error("get-trip-members error:", err);
     return json({ code: "internal_error", message: "Internal error" }, 500);
