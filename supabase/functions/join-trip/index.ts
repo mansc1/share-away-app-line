@@ -94,6 +94,10 @@ Deno.serve(async (req) => {
       return json({ error: "Trip not found" }, 404);
     }
 
+    if (trip.status === "archived" || trip.status === "cancelled") {
+      return json({ code: "trip_closed", error: "This trip is no longer active" }, 410);
+    }
+
     if (trip.status !== "open" && trip.status !== "confirmed") {
       return json({ error: "This trip is no longer accepting members" }, 409);
     }

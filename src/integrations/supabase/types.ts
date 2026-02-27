@@ -223,6 +223,8 @@ export type Database = {
       }
       trips: {
         Row: {
+          archived_at: string | null
+          cancelled_at: string | null
           capacity_total: number
           confirmed_at: string | null
           created_at: string | null
@@ -234,6 +236,8 @@ export type Database = {
           status: string
         }
         Insert: {
+          archived_at?: string | null
+          cancelled_at?: string | null
           capacity_total: number
           confirmed_at?: string | null
           created_at?: string | null
@@ -245,6 +249,8 @@ export type Database = {
           status?: string
         }
         Update: {
+          archived_at?: string | null
+          cancelled_at?: string | null
           capacity_total?: number
           confirmed_at?: string | null
           created_at?: string | null
