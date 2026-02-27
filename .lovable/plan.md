@@ -1,29 +1,28 @@
 
 
-## Plan: Extract PersonAvatar + Add to ExpenseCard
+## Investigation Results
 
-### Step 1: Create `src/components/shared/PersonAvatar.tsx`
-Extract from `PaymentCard.tsx` into a shared component with size prop (`sm`/`md`/`lg` mapping to w-6/w-8/w-12), `name`, and optional `className`. Uses `useTrip().getAvatarForName`, `useState` for error fallback, emoji via `getPersonAvatar`.
+The realtime subscription code in `TripContext.tsx` is correct (filters by `trip_id`, subscribes only after `activeTripId` is available). However, two infrastructure issues prevent it from working:
 
-### Step 2: Update `src/components/PaymentCard.tsx`
-- Remove inline `PersonAvatar` and `PersonAvatarProps` interface (lines ~14-41)
-- Import from `@/components/shared/PersonAvatar`
-- Map existing usage: `sizeClass="w-12 h-12"` → `size="lg"`, `sizeClass="w-8 h-8"` → `size="md"`
+### Problem 1: `trip_members` not in Realtime publication
+The table must be added to `supabase_realtime` publication for postgres_changes events to fire.
 
-### Step 3: Update `src/components/pages/details/ExpenseCard.tsx`
-- Import `PersonAvatar` from shared
-- Replace the "จ่ายโดย" section (around line 119-123) with right-aligned layout showing name + avatar below:
+### Problem 2: No SELECT RLS policy on `trip_members`
+RLS is enabled but there are zero policies. The Supabase realtime client uses the anon key, so it needs a SELECT policy to receive change events. Since this app uses custom LINE auth (not Supabase Auth), `auth.uid()` isn't applicable — a public SELECT policy is needed (matching the pattern already used on the `expenses` table).
+
+### Fix (single SQL migration)
+
+```sql
+-- Enable realtime for trip_members
+ALTER PUBLICATION supabase_realtime ADD TABLE public.trip_members;
+
+-- Allow anon/authenticated to SELECT (needed for realtime subscription)
+CREATE POLICY "Allow public select on trip_members"
+  ON public.trip_members
+  FOR SELECT
+  USING (true);
 ```
-<div className="text-right">
-  <div className="text-xs text-gray-500">จ่ายโดย {expense.paidBy}</div>
-  <div className="mt-1 flex justify-end">
-    <PersonAvatar name={expense.paidBy} size="sm" />
-  </div>
-</div>
-```
 
-### Files
-1. `src/components/shared/PersonAvatar.tsx` (new)
-2. `src/components/PaymentCard.tsx` (remove inline, import shared)
-3. `src/components/pages/details/ExpenseCard.tsx` (add avatar below payer name)
+### Files changed
+- Database migration only. No code changes needed.
 
