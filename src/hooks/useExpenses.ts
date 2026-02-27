@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Expense } from '@/types/expense';
 import { useToast } from '@/components/ui/use-toast';
@@ -11,6 +11,7 @@ export const useExpenses = () => {
   const { toast } = useToast();
   const { trip } = useTrip();
   const activeTripId = trip?.id ?? null;
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchExpenses = useCallback(async () => {
     if (!activeTripId) {
@@ -217,6 +218,33 @@ export const useExpenses = () => {
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
+
+  // Realtime subscription for expenses
+  useEffect(() => {
+    if (!activeTripId) return;
+
+    const channel = supabase
+      .channel(`expenses-${activeTripId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses',
+          filter: `trip_id=eq.${activeTripId}`,
+        },
+        () => {
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          debounceRef.current = setTimeout(() => fetchExpenses(), 300);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [activeTripId, fetchExpenses]);
 
   return {
     expenses,
