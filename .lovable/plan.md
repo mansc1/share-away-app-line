@@ -1,23 +1,32 @@
 
 
-## Realtime Sync for Expenses — Implementation Plan
+## Update `get-invite-info` Edge Function
 
-### Step 1: DB Migration
-Enable realtime on the `expenses` table:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.expenses;
+### Changes to `supabase/functions/get-invite-info/index.ts`
+
+**1. Select `revoked_reason` from invite query** (line 39):
+- Change `.select("id, trip_id, status")` → `.select("id, trip_id, status, revoked_reason")`
+
+**2. Replace the simple `invite_revoked` check** (lines 47-49) with granular handling:
+```typescript
+if (invite.status !== "active") {
+  if (invite.revoked_reason === "capacity_full") {
+    return json({ code: "invite_closed", message: "ทริปเต็มแล้ว" }, 410);
+  }
+  return json({ code: "invite_revoked", message: "ลิงก์ถูกปิดใช้งานแล้ว" }, 410);
+}
 ```
-No RLS changes needed — public SELECT policy already exists.
 
-### Step 2: Update `src/hooks/useExpenses.ts`
-- Add `useRef` to imports
-- Add `debounceRef` for 300ms debounce timer
-- Add new `useEffect` after the existing fetch effect:
-  - Guard on `activeTripId`
-  - Subscribe to `postgres_changes` on `expenses` filtered by `trip_id=eq.${activeTripId}`
-  - On any event: debounced `fetchExpenses()` (300ms)
-  - Cleanup: clear timer + remove channel
+**3. Expand trip status check** (line 62):
+- Change `trip.status === "archived"` → `trip.status === "archived" || trip.status === "cancelled"`
+- Update message to Thai: `"ทริปนี้ปิดแล้ว"`
 
-### Step 3: No other changes
-Keep all optimistic updates as-is.
+No DB migration needed — `revoked_reason` column will be added in the Onboard QR migration. The select will return `null` for existing rows, which is fine since the check is explicit.
+
+**Also update `JoinTripPage.tsx`** error messages map to handle the new `invite_closed` code:
+- Add `invite_closed` → `{ title: "ทริปเต็มแล้ว", desc: "ทริปนี้เต็มแล้ว ไม่สามารถเข้าร่วมได้" }`
+
+### Files changed
+- `supabase/functions/get-invite-info/index.ts` — 3 small edits
+- `src/pages/JoinTripPage.tsx` — add `invite_closed` to error map
 
