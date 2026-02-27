@@ -1,18 +1,23 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, CalendarIcon } from "lucide-react";
 import { Expense } from "@/types/expense";
-import { ExpenseFormData, DATES, CATEGORIES } from "@/types/form";
+import { ExpenseFormData, CATEGORIES } from "@/types/form";
 import { useToast } from "@/components/ui/use-toast";
 import { useTrip } from "@/contexts/TripContext";
 import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
+import { format, parseISO } from "date-fns";
+import { th } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface AddExpenseFormProps {
   onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
@@ -26,7 +31,9 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
   const setIsOpen = onOpenChange || setInternalOpen;
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { members, currentMember, memberNames } = useTrip();
+  const { members, currentMember, memberNames, trip } = useTrip();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [formData, setFormData] = useState<ExpenseFormData>({
     name: '',
     date: '',
@@ -36,6 +43,27 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
     paidBy: currentMember?.display_name || '',
     sharedBy: []
   });
+
+  const minDate = trip?.start_date ? parseISO(trip.start_date) : undefined;
+  const maxDate = trip?.end_date ? parseISO(trip.end_date) : undefined;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (trip?.start_date) {
+      setSelectedDate(parseISO(trip.start_date));
+    } else {
+      setSelectedDate(undefined);
+    }
+  }, [isOpen, trip?.start_date]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      const thaiDate = format(selectedDate, "d MMM", { locale: th }) + ".";
+      setFormData(prev => ({ ...prev, date: thaiDate }));
+    } else {
+      setFormData(prev => ({ ...prev, date: '' }));
+    }
+  }, [selectedDate]);
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -47,7 +75,7 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
       return false;
     }
 
-    if (!formData.date || !formData.time || !formData.category || !formData.paidBy) {
+    if (!selectedDate || !formData.time || !formData.category || !formData.paidBy) {
       toast({
         title: "ข้อผิดพลาด",
         description: "กรุณากรอกข้อมูลให้ครบถ้วน",
@@ -112,6 +140,7 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
         paidBy: '',
         sharedBy: []
       });
+      setSelectedDate(undefined);
       setIsOpen(false);
     } catch (error) {
       console.error('AddExpenseForm - Error in handleSubmit:', error);
@@ -166,17 +195,38 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange }: AddExpenseFormProp
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label htmlFor="date" className="text-sm">วันที่ *</Label>
-              <Select value={formData.date} onValueChange={(value) => setFormData(prev => ({ ...prev, date: value }))}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="เลือกวันที่" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DATES.map(date => (
-                    <SelectItem key={date} value={date} className="text-sm">{date}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-sm">วันที่ *</Label>
+              <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal text-sm",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "d MMM yyyy", { locale: th }) : "เลือกวันที่"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      setSelectedDate(date);
+                      setDatePopoverOpen(false);
+                    }}
+                    disabled={(date) =>
+                      (minDate ? date < minDate : false) || (maxDate ? date > maxDate : false)
+                    }
+                    defaultMonth={selectedDate || minDate}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground mt-1">เลือกได้เฉพาะวันที่ในทริป</p>
             </div>
             <div>
               <Label htmlFor="time" className="text-sm">เวลา *</Label>
