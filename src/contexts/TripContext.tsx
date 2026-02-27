@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useLineAuth } from './LineAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -20,8 +20,14 @@ export interface TripMember {
   id: string;
   user_id: string;
   display_name: string;
+  display_name_norm: string;
   role: string;
   joined_at: string;
+  avatar_url?: string | null;
+}
+
+function normalizeDisplayName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 interface TripContextType {
@@ -34,6 +40,7 @@ interface TripContextType {
   isConfirmed: boolean;
   isAdmin: boolean;
   refetch: () => Promise<void>;
+  getAvatarForName: (name: string) => string | null;
 }
 
 const TripContext = createContext<TripContextType | undefined>(undefined);
@@ -144,10 +151,24 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   const isConfirmed = trip?.status === 'confirmed';
   const isAdmin = currentMember?.role === 'admin';
 
+  const memberAvatarsNorm = useMemo(() => {
+    const map: Record<string, string> = {};
+    members.forEach((m) => {
+      const key = normalizeDisplayName(m.display_name || "");
+      if (key && m.avatar_url) map[key] = m.avatar_url;
+    });
+    return map;
+  }, [members]);
+
+  const getAvatarForName = useCallback((name: string): string | null => {
+    const key = normalizeDisplayName(name || "");
+    return memberAvatarsNorm[key] || null;
+  }, [memberAvatarsNorm]);
+
   return (
     <TripContext.Provider value={{
       trip, members, loading, noTrip, currentMember, memberNames,
-      isConfirmed, isAdmin, refetch: fetchTrip,
+      isConfirmed, isAdmin, refetch: fetchTrip, getAvatarForName,
     }}>
       {children}
     </TripContext.Provider>
