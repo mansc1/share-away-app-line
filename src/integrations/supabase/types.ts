@@ -161,6 +161,8 @@ export type Database = {
           created_at: string | null
           created_by_user_id: string
           id: string
+          revoked_at: string | null
+          revoked_reason: string | null
           status: string
           token: string
           trip_id: string
@@ -169,6 +171,8 @@ export type Database = {
           created_at?: string | null
           created_by_user_id: string
           id?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
           status?: string
           token: string
           trip_id: string
@@ -177,6 +181,8 @@ export type Database = {
           created_at?: string | null
           created_by_user_id?: string
           id?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
           status?: string
           token?: string
           trip_id?: string
