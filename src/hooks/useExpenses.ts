@@ -1,32 +1,36 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Expense } from '@/types/expense';
 import { useToast } from '@/components/ui/use-toast';
+import { useTrip } from '@/contexts/TripContext';
 
 export const useExpenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { trip } = useTrip();
+  const activeTripId = trip?.id ?? null;
 
-  const fetchExpenses = async () => {
-    console.log('fetchExpenses: Fetching all public expenses');
-    
+  const fetchExpenses = useCallback(async () => {
+    if (!activeTripId) {
+      setExpenses([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('expenses')
         .select('*')
+        .eq('trip_id', activeTripId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('fetchExpenses error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('fetchExpenses: Raw data from Supabase:', data);
-
-      const formattedExpenses: Expense[] = data.map(expense => ({
+      const formattedExpenses: Expense[] = (data ?? []).map(expense => ({
         id: expense.id,
+        tripId: expense.trip_id,
         name: expense.name,
         date: expense.date,
         time: expense.time,
@@ -39,7 +43,6 @@ export const useExpenses = () => {
         isConvertedToThb: expense.is_converted_to_thb || false,
       }));
 
-      console.log('fetchExpenses: Formatted expenses:', formattedExpenses);
       setExpenses(formattedExpenses);
     } catch (error: any) {
       console.error('fetchExpenses error:', error);
@@ -51,13 +54,14 @@ export const useExpenses = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTripId, toast]);
 
-  const addExpense = async (expense: Omit<Expense, 'id'>) => {
-    console.log('addExpense called with:', expense);
+  const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
+    if (!activeTripId) return;
 
     try {
       const insertData = {
+        trip_id: activeTripId,
         name: expense.name.trim(),
         date: expense.date,
         time: expense.time,
@@ -65,13 +69,11 @@ export const useExpenses = () => {
         amount: expense.amount,
         paid_by: expense.paidBy,
         shared_by: expense.sharedBy,
-        currency: 'CNY', // Always CNY for new expenses
+        currency: 'CNY',
         thb_amount: null,
         is_converted_to_thb: false,
         user_id: null,
       };
-
-      console.log('addExpense: Inserting data:', insertData);
 
       const { data, error } = await supabase
         .from('expenses')
@@ -79,15 +81,11 @@ export const useExpenses = () => {
         .select()
         .single();
 
-      if (error) {
-        console.error('addExpense: Supabase error:', error);
-        throw error;
-      }
-
-      console.log('addExpense: Successfully inserted:', data);
+      if (error) throw error;
 
       const newExpense: Expense = {
         id: data.id,
+        tripId: data.trip_id,
         name: data.name,
         date: data.date,
         time: data.time,
@@ -100,21 +98,14 @@ export const useExpenses = () => {
         isConvertedToThb: data.is_converted_to_thb || false,
       };
 
-      setExpenses(prev => {
-        const updated = [newExpense, ...prev];
-        console.log('addExpense: Updated expenses state:', updated);
-        return updated;
-      });
+      setExpenses(prev => [newExpense, ...prev]);
       
       toast({
         title: "สำเร็จ",
         description: "เพิ่มรายจ่ายแล้ว",
       });
-
-      console.log('addExpense: Success toast shown');
     } catch (error: any) {
-      console.error('addExpense: Caught error:', error);
-      
+      console.error('addExpense error:', error);
       toast({
         title: "ข้อผิดพลาด",
         description: "ไม่สามารถเพิ่มรายจ่ายได้",
@@ -215,7 +206,7 @@ export const useExpenses = () => {
 
   useEffect(() => {
     fetchExpenses();
-  }, []);
+  }, [fetchExpenses]);
 
   return {
     expenses,

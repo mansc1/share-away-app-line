@@ -1,6 +1,7 @@
 
 export interface Expense {
   id: string;
+  tripId: string;
   name: string;
   date: string;
   time: string;

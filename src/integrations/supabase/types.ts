@@ -52,6 +52,7 @@ export type Database = {
           shared_by: string[]
           thb_amount: number | null
           time: string
+          trip_id: string
           user_id: string | null
         }
         Insert: {
@@ -67,6 +68,7 @@ export type Database = {
           shared_by?: string[]
           thb_amount?: number | null
           time: string
+          trip_id: string
           user_id?: string | null
         }
         Update: {
@@ -82,9 +84,18 @@ export type Database = {
           shared_by?: string[]
           thb_amount?: number | null
           time?: string
+          trip_id?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       line_sessions: {
         Row: {

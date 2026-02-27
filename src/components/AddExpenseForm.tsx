@@ -15,7 +15,7 @@ import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 
 interface AddExpenseFormProps {
-  onAddExpense: (expense: Omit<Expense, 'id'>) => void;
+  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
