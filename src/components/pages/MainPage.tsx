@@ -8,7 +8,7 @@ import EmptyState from "@/components/EmptyState";
 
 interface MainPageProps {
   expenses: Expense[];
-  onAddExpense: (expense: Omit<Expense, 'id'>) => void;
+  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
   addExpenseOpen?: boolean;
   onAddExpenseOpenChange?: (open: boolean) => void;
 }

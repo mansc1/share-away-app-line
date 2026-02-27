@@ -126,6 +126,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
         amount: parseFloat(formData.amount),
         paidBy: formData.paidBy,
         sharedBy: formData.sharedBy,
+        tripId: expense.tripId,
         currency: 'CNY', // Always CNY
         thbAmount,
         isConvertedToThb: formData.isConvertedToThb
