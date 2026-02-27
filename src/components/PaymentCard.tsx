@@ -1,41 +1,7 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { GroupedPayment } from "@/utils/paymentCalculations";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
-import { getPersonAvatar } from "@/utils/avatarUtils";
-import { useTrip } from "@/contexts/TripContext";
-
-interface PersonAvatarProps {
-  name: string;
-  sizeClass: string;
-  textSize: string;
-}
-
-const PersonAvatar = ({ name, sizeClass, textSize }: PersonAvatarProps) => {
-  const { getAvatarForName } = useTrip();
-  const [failed, setFailed] = useState(false);
-  const url = getAvatarForName(name);
-  const fallback = getPersonAvatar(name);
-
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt={name}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        className={`${sizeClass} rounded-full object-cover`}
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-
-  return (
-    <div className={`${sizeClass} ${fallback.bg} rounded-full flex items-center justify-center text-white ${textSize}`}>
-      {fallback.emoji}
-    </div>
-  );
-};
+import PersonAvatar from "@/components/shared/PersonAvatar";
 
 interface PaymentCardProps {
   groupedPayment: GroupedPayment;
@@ -49,7 +15,7 @@ const PaymentCard = ({ groupedPayment, showThb = false }: PaymentCardProps) => {
     <Card className="overflow-hidden shadow-lg border-0 bg-white">
       <CardContent className="p-6">
         <div className="flex items-center gap-4 mb-4">
-          <PersonAvatar name={groupedPayment.from} sizeClass="w-12 h-12" textSize="text-xl" />
+          <PersonAvatar name={groupedPayment.from} size="lg" />
           <div>
             <h3 className="text-xl font-bold text-gray-900">{groupedPayment.from}</h3>
             <p className="text-gray-600">ต้องโอน {groupedPayment.payments.length} รายการ</p>
@@ -61,7 +27,7 @@ const PaymentCard = ({ groupedPayment, showThb = false }: PaymentCardProps) => {
             <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <span className="font-medium text-gray-900">โอนให้</span>
-                <PersonAvatar name={payment.to} sizeClass="w-8 h-8" textSize="text-sm" />
+                <PersonAvatar name={payment.to} size="md" />
                 <span className="font-medium text-gray-900">{payment.to}</span>
               </div>
               <CurrencyDisplay 

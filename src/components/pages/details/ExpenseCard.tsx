@@ -8,6 +8,7 @@ import { Expense } from "@/types/expense";
 import { useToast } from "@/components/ui/use-toast";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 import CurrencyToggle from "@/components/shared/CurrencyToggle";
+import PersonAvatar from "@/components/shared/PersonAvatar";
 import { CATEGORY_ICONS, CATEGORIES } from "./constants";
 
 interface ExpenseCardProps {
@@ -122,9 +123,11 @@ const ExpenseCard = ({ expense, onEdit, onDelete, onConvert }: ExpenseCardProps)
 
         {/* Second row: Paid by (right) */}
         <div className="flex items-center justify-end mb-3">
-          {/* Paid by */}
-          <div className="text-xs text-gray-500">
-            จ่ายโดย {expense.paidBy}
+          <div className="text-right">
+            <div className="text-xs text-gray-500">จ่ายโดย {expense.paidBy}</div>
+            <div className="mt-1 flex justify-end">
+              <PersonAvatar name={expense.paidBy} size="sm" />
+            </div>
           </div>
         </div>
 
