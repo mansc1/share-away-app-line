@@ -1,32 +1,39 @@
 
 
-## Update `get-invite-info` Edge Function
+## Plan: Add migration + auto-revoke in join-trip
 
-### Changes to `supabase/functions/get-invite-info/index.ts`
+### Step 1: Database Migration
+Add two columns to `trip_invites`:
+```sql
+ALTER TABLE public.trip_invites
+  ADD COLUMN IF NOT EXISTS revoked_at timestamptz,
+  ADD COLUMN IF NOT EXISTS revoked_reason text;
+```
 
-**1. Select `revoked_reason` from invite query** (line 39):
-- Change `.select("id, trip_id, status")` → `.select("id, trip_id, status, revoked_reason")`
-
-**2. Replace the simple `invite_revoked` check** (lines 47-49) with granular handling:
+### Step 2: Update `join-trip` Edge Function
+After the successful member insert (line ~145), add auto-revoke logic:
+1. Re-count members for the trip
+2. If `count >= trip.capacity_total`, bulk-revoke all active invites:
 ```typescript
-if (invite.status !== "active") {
-  if (invite.revoked_reason === "capacity_full") {
-    return json({ code: "invite_closed", message: "ทริปเต็มแล้ว" }, 410);
-  }
-  return json({ code: "invite_revoked", message: "ลิงก์ถูกปิดใช้งานแล้ว" }, 410);
+const { count: newCount } = await supabase
+  .from("trip_members")
+  .select("id", { count: "exact", head: true })
+  .eq("trip_id", trip.id);
+
+if (newCount !== null && newCount >= trip.capacity_total) {
+  await supabase
+    .from("trip_invites")
+    .update({
+      status: "revoked",
+      revoked_at: new Date().toISOString(),
+      revoked_reason: "capacity_full",
+    })
+    .eq("trip_id", trip.id)
+    .eq("status", "active");
 }
 ```
 
-**3. Expand trip status check** (line 62):
-- Change `trip.status === "archived"` → `trip.status === "archived" || trip.status === "cancelled"`
-- Update message to Thai: `"ทริปนี้ปิดแล้ว"`
-
-No DB migration needed — `revoked_reason` column will be added in the Onboard QR migration. The select will return `null` for existing rows, which is fine since the check is explicit.
-
-**Also update `JoinTripPage.tsx`** error messages map to handle the new `invite_closed` code:
-- Add `invite_closed` → `{ title: "ทริปเต็มแล้ว", desc: "ทริปนี้เต็มแล้ว ไม่สามารถเข้าร่วมได้" }`
-
 ### Files changed
-- `supabase/functions/get-invite-info/index.ts` — 3 small edits
-- `src/pages/JoinTripPage.tsx` — add `invite_closed` to error map
+- **Migration**: 1 SQL file (add `revoked_at`, `revoked_reason` to `trip_invites`)
+- **Edge Function**: `supabase/functions/join-trip/index.ts` — add ~12 lines after member insert
 
