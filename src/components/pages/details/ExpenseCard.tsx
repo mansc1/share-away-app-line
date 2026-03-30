@@ -13,6 +13,7 @@ import { CATEGORY_ICONS, CATEGORIES } from "./constants";
 
 interface ExpenseCardProps {
   expense: Expense;
+  canModify: boolean;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
   onConvert: (expense: Expense) => void;
