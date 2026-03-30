@@ -12,13 +12,15 @@ interface DetailsPageProps {
   onUpdateExpense: (id: string, expense: Omit<Expense, 'id'>) => void;
   onDeleteExpense: (id: string) => void;
   onConvertExpense?: (id: string, thbAmount: number) => void;
+  canModifyExpense: (expense: Expense) => boolean;
 }
 
 const DetailsPage = ({ 
   expenses, 
   onUpdateExpense, 
   onDeleteExpense, 
-  onConvertExpense 
+  onConvertExpense,
+  canModifyExpense 
 }: DetailsPageProps) => {
   console.log('DetailsPage rendered with expenses:', expenses);
   console.log('Number of expenses:', expenses?.length || 0);
@@ -115,6 +117,7 @@ const DetailsPage = ({
             <ExpenseCard
               key={expense.id}
               expense={expense}
+              canModify={canModifyExpense(expense)}
               onEdit={handleEdit}
               onDelete={onDeleteExpense}
               onConvert={handleConvert}
