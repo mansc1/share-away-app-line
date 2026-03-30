@@ -13,6 +13,7 @@ import { CATEGORY_ICONS, CATEGORIES } from "./constants";
 
 interface ExpenseCardProps {
   expense: Expense;
+  canModify: boolean;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
   onConvert: (expense: Expense) => void;
@@ -25,7 +26,7 @@ const COLORS = {
   other: '#34D399' // Green
 };
 
-const ExpenseCard = ({ expense, onEdit, onDelete, onConvert }: ExpenseCardProps) => {
+const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: ExpenseCardProps) => {
   const [showThb, setShowThb] = useState(() => {
     const saved = localStorage.getItem(`expense-toggle-${expense.id}`);
     return saved ? JSON.parse(saved) : false;
@@ -158,7 +159,7 @@ const ExpenseCard = ({ expense, onEdit, onDelete, onConvert }: ExpenseCardProps)
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          {!expense.isConvertedToThb && (
+          {canModify && !expense.isConvertedToThb && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -170,25 +171,29 @@ const ExpenseCard = ({ expense, onEdit, onDelete, onConvert }: ExpenseCardProps)
             </Button>
           )}
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onEdit(expense)}
-            className="flex-1"
-          >
-            <Edit className="w-4 h-4 mr-1" />
-            แก้ไข
-          </Button>
+          {canModify && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onEdit(expense)}
+              className="flex-1"
+            >
+              <Edit className="w-4 h-4 mr-1" />
+              แก้ไข
+            </Button>
+          )}
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleDelete}
-            className="text-red-600 border-red-200 hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" />
-            ลบ
-          </Button>
+          {canModify && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDelete}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              ลบ
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

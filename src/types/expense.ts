@@ -12,6 +12,9 @@ export interface Expense {
   currency: string;
   thbAmount?: number;
   isConvertedToThb: boolean;
+  createdByUserId?: string | null;
+  updatedByUserId?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface PaymentSummary {

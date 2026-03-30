@@ -43,6 +43,7 @@ export type Database = {
           amount: number
           category: string
           created_at: string
+          created_by_user_id: string | null
           currency: string
           date: string
           id: string
@@ -53,12 +54,15 @@ export type Database = {
           thb_amount: number | null
           time: string
           trip_id: string
+          updated_at: string | null
+          updated_by_user_id: string | null
           user_id: string | null
         }
         Insert: {
           amount: number
           category: string
           created_at?: string
+          created_by_user_id?: string | null
           currency?: string
           date: string
           id?: string
@@ -69,12 +73,15 @@ export type Database = {
           thb_amount?: number | null
           time: string
           trip_id: string
+          updated_at?: string | null
+          updated_by_user_id?: string | null
           user_id?: string | null
         }
         Update: {
           amount?: number
           category?: string
           created_at?: string
+          created_by_user_id?: string | null
           currency?: string
           date?: string
           id?: string
@@ -85,6 +92,8 @@ export type Database = {
           thb_amount?: number | null
           time?: string
           trip_id?: string
+          updated_at?: string | null
+          updated_by_user_id?: string | null
           user_id?: string | null
         }
         Relationships: [

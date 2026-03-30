@@ -22,7 +22,8 @@ const ExpenseApp = () => {
     addExpense, 
     updateExpense, 
     deleteExpense, 
-    convertExpenseToCurrency 
+    convertExpenseToCurrency,
+    canModifyExpense 
   } = useExpenses();
 
   console.log('ExpenseApp - Current expenses:', expenses);
@@ -54,6 +55,7 @@ const ExpenseApp = () => {
             onUpdateExpense={updateExpense}
             onDeleteExpense={deleteExpense}
             onConvertExpense={convertExpenseToCurrency}
+            canModifyExpense={canModifyExpense}
           />
         );
       case 'payment':

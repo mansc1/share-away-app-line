@@ -44,3 +44,12 @@ verify_jwt = false
 
 [functions.cancel-trip]
 verify_jwt = false
+
+[functions.create-expense]
+verify_jwt = false
+
+[functions.update-expense]
+verify_jwt = false
+
+[functions.delete-expense]
+verify_jwt = false
