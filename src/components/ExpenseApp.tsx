@@ -1,7 +1,6 @@
 
-import { useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Routes, Route } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { useExpenses } from "@/hooks/useExpenses";
 import { useTrip } from "@/contexts/TripContext";
@@ -12,10 +11,20 @@ import DetailsPage from "./pages/DetailsPage";
 import PaymentPage from "./pages/PaymentPage";
 import ChatbotPage from "./pages/ChatbotPage";
 
+const isSupportedTab = (value: string | null): value is "main" | "details" | "payment" | "chatbot" => {
+  return value === "main" || value === "details" || value === "payment" || value === "chatbot";
+};
+
 const ExpenseApp = () => {
-  const [currentPage, setCurrentPage] = useState('main');
-  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
-  const { trip, loading: tripLoading, noTrip } = useTrip();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const requestedOpen = searchParams.get("open");
+  const initialPage = useMemo(() => {
+    return isSupportedTab(requestedTab) ? requestedTab : "main";
+  }, [requestedTab]);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(requestedOpen === "add-expense");
+  const { trip, loading: tripLoading, noTrip, isTripSwitching } = useTrip();
   const { 
     expenses, 
     loading, 
@@ -28,6 +37,37 @@ const ExpenseApp = () => {
 
   console.log('ExpenseApp - Current expenses:', expenses);
   console.log('ExpenseApp - Loading state:', loading);
+
+  useEffect(() => {
+    setCurrentPage(initialPage);
+  }, [initialPage]);
+
+  useEffect(() => {
+    setAddExpenseOpen(requestedOpen === "add-expense");
+  }, [requestedOpen]);
+
+  const updateQueryState = (nextPage: string, nextOpen: boolean) => {
+    const params = new URLSearchParams(searchParams);
+
+    if (nextPage === "main") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextPage);
+    }
+
+    if (nextOpen) {
+      params.set("open", "add-expense");
+    } else {
+      params.delete("open");
+    }
+
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleAddExpenseOpenChange = (open: boolean) => {
+    setAddExpenseOpen(open);
+    updateQueryState(currentPage, open);
+  };
 
   if (loading || tripLoading) {
     return (
@@ -47,7 +87,7 @@ const ExpenseApp = () => {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'main':
-        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={setAddExpenseOpen} />;
+        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching} />;
       case 'details':
         return (
           <DetailsPage 
@@ -56,17 +96,19 @@ const ExpenseApp = () => {
             onDeleteExpense={deleteExpense}
             onConvertExpense={convertExpenseToCurrency}
             canModifyExpense={canModifyExpense}
+            actionsDisabled={isTripSwitching}
           />
         );
       case 'payment':
-        return <PaymentPage expenses={expenses} />;
+        return <PaymentPage expenses={expenses} actionsDisabled={isTripSwitching} />;
       case 'chatbot':
         return <ChatbotPage expenses={expenses} onRequestAddExpense={() => {
           setCurrentPage('main');
-          setTimeout(() => setAddExpenseOpen(true), 100);
+          updateQueryState('main', false);
+          setTimeout(() => handleAddExpenseOpenChange(true), 100);
         }} />;
       default:
-        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={setAddExpenseOpen} />;
+        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching} />;
     }
   };
 
@@ -84,6 +126,7 @@ const ExpenseApp = () => {
   const handlePageChange = (pageIndex: number) => {
     const newPage = reversePageMap[pageIndex] || 'main';
     setCurrentPage(newPage);
+    updateQueryState(newPage, addExpenseOpen);
   };
 
   return (
@@ -101,6 +144,17 @@ const ExpenseApp = () => {
           />
         </Routes>
       </main>
+      {isTripSwitching && (
+        <div className="fixed inset-0 z-40 bg-white/65 backdrop-blur-[1px]">
+          <div className="mx-auto flex h-full max-w-md items-center justify-center px-6">
+            <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-center shadow-xl">
+              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-blue-600 border-b-transparent" />
+              <p className="mt-3 text-sm font-medium text-slate-900">กำลังสลับทริป</p>
+              <p className="mt-1 text-xs text-slate-500">ล็อกการแก้ไขชั่วคราวเพื่อให้ข้อมูลทุกส่วนตรงกัน</p>
+            </div>
+          </div>
+        </div>
+      )}
       <BottomNavigation 
         pages={pages}
         currentPage={currentPageIndex} 

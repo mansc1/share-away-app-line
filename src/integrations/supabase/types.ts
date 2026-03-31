@@ -165,6 +165,65 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          confirmed_at: string | null
+          created_at: string
+          created_by_user_id: string
+          from_user_id: string
+          id: string
+          paid_at: string | null
+          settlement_amount: number | null
+          settlement_currency: string
+          status: string
+          to_user_id: string
+          trip_id: string
+          updated_at: string
+          updated_by_user_id: string
+        }
+        Insert: {
+          amount: number
+          confirmed_at?: string | null
+          created_at?: string
+          created_by_user_id: string
+          from_user_id: string
+          id?: string
+          paid_at?: string | null
+          settlement_amount?: number | null
+          settlement_currency?: string
+          status?: string
+          to_user_id: string
+          trip_id: string
+          updated_at?: string
+          updated_by_user_id: string
+        }
+        Update: {
+          amount?: number
+          confirmed_at?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          from_user_id?: string
+          id?: string
+          paid_at?: string | null
+          settlement_amount?: number | null
+          settlement_currency?: string
+          status?: string
+          to_user_id?: string
+          trip_id?: string
+          updated_at?: string
+          updated_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_invites: {
         Row: {
           created_at: string | null
@@ -255,6 +314,8 @@ export type Database = {
           confirmed_at: string | null
           created_at: string | null
           created_by_user_id: string
+          default_expense_currency: string | null
+          destination_country_code: string | null
           end_date: string
           id: string
           name: string
@@ -268,6 +329,8 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string | null
           created_by_user_id: string
+          default_expense_currency?: string | null
+          destination_country_code?: string | null
           end_date: string
           id?: string
           name: string
@@ -281,6 +344,8 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string | null
           created_by_user_id?: string
+          default_expense_currency?: string | null
+          destination_country_code?: string | null
           end_date?: string
           id?: string
           name?: string

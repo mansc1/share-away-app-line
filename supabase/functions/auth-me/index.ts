@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,42 +21,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const sessionToken = authHeader.replace("Bearer ", "");
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+    const user = await authenticateLineUser(supabase, req);
 
-    const { data: session, error } = await supabase
-      .from("line_sessions")
-      .select("user_id, expires_at")
-      .eq("session_token", sessionToken)
-      .single();
-
-    if (error || !session) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (new Date(session.expires_at) < new Date()) {
-      // Clean up expired session
-      await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-      return new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: user, error: userErr } = await supabase
-      .from("line_users")
-      .select("id, line_sub, display_name, avatar_url")
-      .eq("id", session.user_id)
-      .single();
-
-    if (userErr || !user) {
+    if (!user) {
       return new Response(JSON.stringify({ error: "User not found" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -5,12 +5,12 @@ import { Expense } from '@/types/expense';
 import { useToast } from '@/components/ui/use-toast';
 import { useTrip } from '@/contexts/TripContext';
 import { useLineAuth } from '@/contexts/LineAuthContext';
+import { getStoredSessionToken } from '@/lib/session';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = 'line_session_token';
 
 function getAuthHeaders() {
-  const token = localStorage.getItem(SESSION_KEY);
+  const token = getStoredSessionToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -18,7 +18,7 @@ export const useExpenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { trip, isAdmin } = useTrip();
+  const { trip, isAdmin, isTripSwitching } = useTrip();
   const { user } = useLineAuth();
   const activeTripId = trip?.id ?? null;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,8 +26,8 @@ export const useExpenses = () => {
   const canModifyExpense = useCallback((expense: Expense): boolean => {
     if (isAdmin) return true;
     if (!expense.createdByUserId) return false; // legacy → only admin
-    return expense.createdByUserId === user?.line_sub;
-  }, [isAdmin, user?.line_sub]);
+    return expense.createdByUserId === user?.id;
+  }, [isAdmin, user?.id]);
 
   const fetchExpenses = useCallback(async () => {
     if (!activeTripId) {
@@ -77,7 +77,7 @@ export const useExpenses = () => {
   }, [activeTripId, toast]);
 
   const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
-    if (!activeTripId) return;
+    if (!activeTripId || isTripSwitching) return;
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-expense`, {
@@ -92,6 +92,7 @@ export const useExpenses = () => {
           amount: expense.amount,
           paid_by: expense.paidBy,
           shared_by: expense.sharedBy,
+          currency: expense.currency,
         }),
       });
 
@@ -136,7 +137,7 @@ export const useExpenses = () => {
   };
 
   const updateExpense = async (id: string, expense: Omit<Expense, 'id'>) => {
-    if (!activeTripId) return;
+    if (!activeTripId || isTripSwitching) return;
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/update-expense`, {
@@ -185,7 +186,7 @@ export const useExpenses = () => {
   };
 
   const convertExpenseToCurrency = async (id: string, thbAmount: number) => {
-    if (!activeTripId) return;
+    if (!activeTripId || isTripSwitching) return;
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/update-expense`, {
@@ -218,7 +219,7 @@ export const useExpenses = () => {
   };
 
   const deleteExpense = async (id: string) => {
-    if (!activeTripId) return;
+    if (!activeTripId || isTripSwitching) return;
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-expense`, {

@@ -11,6 +11,7 @@ import LineCallbackPage from "./pages/LineCallbackPage";
 import TripManagePage from "./pages/TripManagePage";
 import TripNewPage from "./pages/TripNewPage";
 import JoinTripPage from "./pages/JoinTripPage";
+import InviteTripPage from "./pages/InviteTripPage";
 import { LineAuthProvider } from "./contexts/LineAuthContext";
 import { TripProvider } from "./contexts/TripContext";
 
@@ -30,7 +31,8 @@ const App = () => (
               <Route path="/app" element={<Index />} />
               <Route path="/trip/manage" element={<TripManagePage />} />
               <Route path="/trip/new" element={<TripNewPage />} />
-              <Route path="/join/:token" element={<JoinTripPage />} />
+              <Route path="/invite/:token" element={<InviteTripPage />} />
+              <Route path="/join/:token" element={<InviteTripPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TripProvider>

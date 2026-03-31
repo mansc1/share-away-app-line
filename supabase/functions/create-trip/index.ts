@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
+import { getDefaultCurrencyForCountry } from "../_shared/country-currency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,32 +13,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-async function authenticateUser(supabase: any, req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const { data: session } = await supabase
-    .from("line_sessions")
-    .select("user_id, expires_at")
-    .eq("session_token", sessionToken)
-    .single();
-
-  if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) {
-    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-    return null;
-  }
-
-  const { data: user } = await supabase
-    .from("line_users")
-    .select("id, display_name")
-    .eq("id", session.user_id)
-    .single();
-
-  return user ?? null;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -53,15 +29,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const user = await authenticateUser(supabase, req);
+    const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json();
-    const { name, start_date, end_date, capacity_total, display_name } = body;
+    const { name, start_date, end_date, capacity_total, display_name, destination_country_code } = body;
 
     // Validate required fields
-    if (!name || !start_date || !end_date || !capacity_total) {
-      return json({ error: "Missing required fields: name, start_date, end_date, capacity_total" }, 400);
+    if (!name || !start_date || !end_date || !capacity_total || !destination_country_code) {
+      return json({ error: "Missing required fields: name, start_date, end_date, capacity_total, destination_country_code" }, 400);
     }
 
     if (typeof capacity_total !== "number" || capacity_total < 2) {
@@ -77,6 +53,11 @@ Deno.serve(async (req) => {
       return json({ error: "display_name is required" }, 400);
     }
 
+    const defaultExpenseCurrency = getDefaultCurrencyForCountry(destination_country_code);
+    if (!defaultExpenseCurrency) {
+      return json({ error: "Unsupported destination_country_code" }, 400);
+    }
+
     // Create trip
     const { data: trip, error: tripErr } = await supabase
       .from("trips")
@@ -86,6 +67,8 @@ Deno.serve(async (req) => {
         end_date,
         capacity_total,
         created_by_user_id: user.id,
+        destination_country_code,
+        default_expense_currency: defaultExpenseCurrency,
       })
       .select()
       .single();
@@ -118,7 +101,7 @@ Deno.serve(async (req) => {
       .from("user_active_trip")
       .upsert({ user_id: user.id, trip_id: trip.id, updated_at: new Date().toISOString() });
 
-    return json({ trip_id: trip.id, name: trip.name }, 201);
+    return json({ trip_id: trip.id, name: trip.name, destination_country_code, default_expense_currency: defaultExpenseCurrency }, 201);
   } catch (err) {
     console.error("create-trip error:", err);
     return json({ error: "Internal error" }, 500);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useLineAuth } from "@/contexts/LineAuthContext";
+import { useTrip } from "@/contexts/TripContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, CalendarDays, Users, AlertTriangle } from "lucide-react";
+import { getStoredSessionToken } from "@/lib/session";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = "line_session_token";
+const LINE_BOT_ADD_FRIEND_URL = import.meta.env.VITE_LINE_BOT_ADD_FRIEND_URL;
 
 interface TripInfo {
   id: string;
@@ -33,6 +35,7 @@ const JoinTripPage = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated, loading: authLoading } = useLineAuth();
+  const { refetch } = useTrip();
   const { toast } = useToast();
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
@@ -86,7 +89,7 @@ const JoinTripPage = () => {
     setJoining(true);
     setJoinError(null);
     try {
-      const sessionToken = localStorage.getItem(SESSION_KEY);
+      const sessionToken = getStoredSessionToken();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/join-trip`, {
         method: "POST",
         headers: {
@@ -112,7 +115,8 @@ const JoinTripPage = () => {
         title: data.already_member ? "คุณเป็นสมาชิกอยู่แล้ว" : "เข้าร่วมทริปสำเร็จ!",
         description: data.name,
       });
-      navigate("/app");
+      await refetch();
+      navigate(`/app?trip=${data.trip_id}`, { replace: true });
     } catch {
       toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
     } finally {
@@ -205,6 +209,14 @@ const JoinTripPage = () => {
             </div>
           )}
 
+          {LINE_BOT_ADD_FRIEND_URL && (
+            <Button variant="outline" asChild className="w-full">
+              <a href={LINE_BOT_ADD_FRIEND_URL} target="_blank" rel="noreferrer">
+                เพิ่มบอท TripSplit
+              </a>
+            </Button>
+          )}
+
           {/* Not authenticated */}
           {!authLoading && !isAuthenticated && !is_full && (
             <div className="space-y-3">
@@ -212,7 +224,7 @@ const JoinTripPage = () => {
               <Button
                 className="w-full"
                 onClick={() => {
-                  localStorage.setItem("post_login_redirect", `/join/${token}`);
+                  localStorage.setItem("post_login_redirect", `/invite/${token}`);
                   window.location.href = `${SUPABASE_URL}/functions/v1/auth-line-start`;
                 }}
               >

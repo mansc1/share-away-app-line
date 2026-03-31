@@ -7,11 +7,13 @@ import { CalendarIcon, ArrowLeft, Loader2, Users, Plane } from "lucide-react";
 import { useLineAuth } from "@/contexts/LineAuthContext";
 import { useTrip } from "@/contexts/TripContext";
 import { useToast } from "@/hooks/use-toast";
+import { COUNTRY_CURRENCY_OPTIONS, getDefaultCurrencyForCountry } from "@/constants/countryCurrency";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -32,10 +34,13 @@ const TripNewPage = () => {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [capacity, setCapacity] = useState("4");
+  const [destinationCountryCode, setDestinationCountryCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+
+  const defaultExpenseCurrency = getDefaultCurrencyForCountry(destinationCountryCode);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +63,10 @@ const TripNewPage = () => {
       toast({ title: "จำนวนคนต้องอย่างน้อย 2 คน", variant: "destructive" });
       return;
     }
+    if (!destinationCountryCode || !defaultExpenseCurrency) {
+      toast({ title: "กรุณาเลือกประเทศปลายทางหลัก", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -73,6 +82,7 @@ const TripNewPage = () => {
           start_date: format(startDate, "yyyy-MM-dd"),
           end_date: format(endDate, "yyyy-MM-dd"),
           capacity_total: cap,
+          destination_country_code: destinationCountryCode,
         }),
       });
       const data = await res.json();
@@ -248,6 +258,30 @@ const TripNewPage = () => {
                 <p className="text-xs text-muted-foreground">
                   รวมตัวคุณด้วย (อย่างน้อย 2 คน)
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="destination-country">ประเทศปลายทางหลัก *</Label>
+                <Select value={destinationCountryCode} onValueChange={setDestinationCountryCode}>
+                  <SelectTrigger id="destination-country">
+                    <SelectValue placeholder="เลือกประเทศปลายทาง" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRY_CURRENCY_OPTIONS.map((option) => (
+                      <SelectItem key={option.countryCode} value={option.countryCode}>
+                        {option.countryLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  ใช้เพื่อกำหนดสกุลเงินเริ่มต้นตอนเพิ่มรายจ่าย
+                </p>
+                {defaultExpenseCurrency && (
+                  <div className="rounded-lg bg-muted px-3 py-2 text-sm text-foreground">
+                    สกุลเงินเริ่มต้น: <span className="font-semibold">{defaultExpenseCurrency}</span>
+                  </div>
+                )}
               </div>
 
               {/* Submit */}

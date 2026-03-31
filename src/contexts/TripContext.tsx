@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useLineAuth } from './LineAuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getStoredSessionToken } from '@/lib/session';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = 'line_session_token';
 
 export interface Trip {
   id: string;
@@ -14,6 +15,8 @@ export interface Trip {
   status: string;
   created_by_user_id: string;
   confirmed_at: string | null;
+  destination_country_code: string | null;
+  default_expense_currency: string | null;
 }
 
 export interface TripMember {
@@ -35,11 +38,18 @@ interface TripContextType {
   members: TripMember[];
   loading: boolean;
   noTrip: boolean;
+  effectiveTripId: string | null;
+  persistedActiveTripId: string | null;
+  isTripOverrideActive: boolean;
+  tripSwitchingToId: string | null;
+  isTripSwitching: boolean;
   currentMember: TripMember | null;
   memberNames: string[];
   isConfirmed: boolean;
   isAdmin: boolean;
   refetch: () => Promise<void>;
+  beginTripSwitch: (tripId: string) => void;
+  clearTripSwitch: () => void;
   getAvatarForName: (name: string) => string | null;
 }
 
@@ -52,26 +62,80 @@ export const useTrip = () => {
 };
 
 export const TripProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAuthenticated } = useLineAuth();
+  const { user, isAuthenticated, loading: authLoading } = useLineAuth();
+  const location = useLocation();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [noTrip, setNoTrip] = useState(false);
+  const [persistedActiveTripId, setPersistedActiveTripId] = useState<string | null>(null);
+  const [tripSwitchingToId, setTripSwitchingToId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tripRef = useRef<Trip | null>(null);
+  const membersRef = useRef<TripMember[]>([]);
+  const overrideTripId = useMemo(() => {
+    if (location.pathname !== '/app') return null;
+    const params = new URLSearchParams(location.search);
+    return params.get('trip');
+  }, [location.pathname, location.search]);
+  const isTripOverrideActive = !!overrideTripId;
+  const effectiveTripId = trip?.id ?? null;
 
-  const getToken = () => localStorage.getItem(SESSION_KEY);
+  const getToken = () => getStoredSessionToken();
+
+  useEffect(() => {
+    tripRef.current = trip;
+  }, [trip]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
   const fetchTrip = useCallback(async () => {
     const token = getToken();
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      setTrip(null);
+      setMembers([]);
+      setNoTrip(false);
+      setPersistedActiveTripId(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/get-active-trip`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+      setPersistedActiveTripId(data.trip?.id ?? null);
+      let resolvedTrip = data.trip ?? null;
 
-      if (!data.trip) {
+      if (overrideTripId && overrideTripId !== resolvedTrip?.id) {
+        const overrideRes = await fetch(`${SUPABASE_URL}/functions/v1/get-trip-by-id`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ trip_id: overrideTripId }),
+        });
+
+        if (overrideRes.ok) {
+          const overrideData = await overrideRes.json();
+          resolvedTrip = overrideData.trip ?? resolvedTrip;
+        }
+      }
+
+      if (!resolvedTrip) {
+        if (tripSwitchingToId && tripRef.current) {
+          setTrip(tripRef.current);
+          setMembers(membersRef.current);
+          setNoTrip(false);
+          setLoading(false);
+          return;
+        }
         setTrip(null);
         setMembers([]);
         setNoTrip(true);
@@ -79,17 +143,16 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      setTrip(data.trip);
+      setTrip(resolvedTrip);
       setNoTrip(false);
 
-      // Fetch members
       const membersRes = await fetch(`${SUPABASE_URL}/functions/v1/get-trip-members`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ trip_id: data.trip.id }),
+        body: JSON.stringify({ trip_id: resolvedTrip.id }),
       });
       const membersData = await membersRes.json();
       setMembers(membersData.members || []);
@@ -98,7 +161,7 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [overrideTripId, tripSwitchingToId]);
 
   const debouncedRefetch = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -109,6 +172,31 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Realtime subscription keyed on trip.id — only re-subscribes when trip actually changes
   const activeTripId = trip?.id ?? null;
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+
+    const channel = supabase
+      .channel(`user-active-trip-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_active_trip',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          debouncedRefetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [isAuthenticated, user?.id, debouncedRefetch]);
 
   useEffect(() => {
     if (!isAuthenticated || !activeTripId) return;
@@ -136,12 +224,47 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isAuthenticated, activeTripId, debouncedRefetch]);
 
   useEffect(() => {
+    if (!isAuthenticated || !activeTripId) return;
+
+    const channel = supabase
+      .channel(`trip-${activeTripId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trips',
+          filter: `id=eq.${activeTripId}`,
+        },
+        () => {
+          debouncedRefetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [isAuthenticated, activeTripId, debouncedRefetch]);
+
+  useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (isAuthenticated) {
       fetchTrip();
     } else {
+      setTrip(null);
+      setMembers([]);
+      setNoTrip(false);
+      setPersistedActiveTripId(null);
+      setTripSwitchingToId(null);
       setLoading(false);
     }
-  }, [isAuthenticated, fetchTrip]);
+  }, [authLoading, isAuthenticated, fetchTrip]);
 
   const currentMember = user
     ? members.find(m => m.user_id === user.id) ?? null
@@ -150,6 +273,12 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   const memberNames = members.map(m => m.display_name);
   const isConfirmed = trip?.status === 'confirmed';
   const isAdmin = currentMember?.role === 'admin';
+  const beginTripSwitch = useCallback((tripId: string) => {
+    setTripSwitchingToId(tripId);
+  }, []);
+  const clearTripSwitch = useCallback(() => {
+    setTripSwitchingToId(null);
+  }, []);
 
   const memberAvatarsNorm = useMemo(() => {
     const map: Record<string, string> = {};
@@ -167,8 +296,23 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <TripContext.Provider value={{
-      trip, members, loading, noTrip, currentMember, memberNames,
-      isConfirmed, isAdmin, refetch: fetchTrip, getAvatarForName,
+      trip,
+      members,
+      loading,
+      noTrip,
+      effectiveTripId,
+      persistedActiveTripId,
+      isTripOverrideActive,
+      tripSwitchingToId,
+      isTripSwitching: !!tripSwitchingToId,
+      currentMember,
+      memberNames,
+      isConfirmed,
+      isAdmin,
+      refetch: fetchTrip,
+      beginTripSwitch,
+      clearTripSwitch,
+      getAvatarForName,
     }}>
       {children}
     </TripContext.Provider>

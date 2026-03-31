@@ -5,6 +5,7 @@ export interface ExpenseFormData {
   time: string;
   category: string;
   amount: string;
+  currency: string;
   paidBy: string;
   sharedBy: string[];
 }

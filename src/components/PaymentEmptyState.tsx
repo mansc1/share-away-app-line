@@ -9,10 +9,10 @@ const PaymentEmptyState = () => {
           <span className="text-4xl">✓</span>
         </div>
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          เรียบร้อยแล้ว!
+          ยังไม่มียอดโอนค้าง
         </h3>
         <p className="text-gray-500">
-          ทุกคนได้จ่ายเงินครบถ้วนแล้ว
+          ตอนนี้ยังไม่จำเป็นต้องโอนเงินเพิ่มจากรายการรายจ่ายที่มี
         </p>
       </CardContent>
     </Card>
