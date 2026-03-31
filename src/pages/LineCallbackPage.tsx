@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { persistSessionToken } from "@/lib/session";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = "line_session_token";
 
 interface ErrorDetails {
   error: string;
@@ -50,7 +50,7 @@ const LineCallbackPage = () => {
           return;
         }
 
-        localStorage.setItem(SESSION_KEY, data.session_token);
+        persistSessionToken(data.session_token);
         const redirect = localStorage.getItem("post_login_redirect");
         localStorage.removeItem("post_login_redirect");
 

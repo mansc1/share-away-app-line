@@ -13,6 +13,7 @@ interface DetailsPageProps {
   onDeleteExpense: (id: string) => void;
   onConvertExpense?: (id: string, thbAmount: number) => void;
   canModifyExpense: (expense: Expense) => boolean;
+  actionsDisabled?: boolean;
 }
 
 const DetailsPage = ({ 
@@ -20,7 +21,8 @@ const DetailsPage = ({
   onUpdateExpense, 
   onDeleteExpense, 
   onConvertExpense,
-  canModifyExpense 
+  canModifyExpense,
+  actionsDisabled,
 }: DetailsPageProps) => {
   console.log('DetailsPage rendered with expenses:', expenses);
   console.log('Number of expenses:', expenses?.length || 0);
@@ -118,6 +120,7 @@ const DetailsPage = ({
               key={expense.id}
               expense={expense}
               canModify={canModifyExpense(expense)}
+              actionsDisabled={actionsDisabled}
               onEdit={handleEdit}
               onDelete={onDeleteExpense}
               onConvert={handleConvert}
@@ -131,6 +134,7 @@ const DetailsPage = ({
         isOpen={!!editingExpense}
         onClose={handleCloseEdit}
         onUpdate={onUpdateExpense}
+        disabled={actionsDisabled}
       />
 
       <CurrencyConversionDialog

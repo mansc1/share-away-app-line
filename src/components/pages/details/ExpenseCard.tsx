@@ -10,10 +10,12 @@ import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 import CurrencyToggle from "@/components/shared/CurrencyToggle";
 import PersonAvatar from "@/components/shared/PersonAvatar";
 import { CATEGORY_ICONS, CATEGORIES } from "./constants";
+import { type CurrencyType } from "@/constants/currency";
 
 interface ExpenseCardProps {
   expense: Expense;
   canModify: boolean;
+  actionsDisabled?: boolean;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
   onConvert: (expense: Expense) => void;
@@ -26,7 +28,7 @@ const COLORS = {
   other: '#34D399' // Green
 };
 
-const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: ExpenseCardProps) => {
+const ExpenseCard = ({ expense, canModify, actionsDisabled, onEdit, onDelete, onConvert }: ExpenseCardProps) => {
   const [showThb, setShowThb] = useState(() => {
     const saved = localStorage.getItem(`expense-toggle-${expense.id}`);
     return saved ? JSON.parse(saved) : false;
@@ -77,7 +79,8 @@ const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: Expens
   };
 
   const currentAmount = showThb && expense.thbAmount ? expense.thbAmount : expense.amount;
-  const currentCurrency = showThb && expense.thbAmount ? 'THB' : 'CNY';
+  const originalCurrency = (expense.currency || 'CNY') as CurrencyType;
+  const currentCurrency = showThb && expense.thbAmount ? 'THB' : originalCurrency;
   const IconComponent = CATEGORY_ICONS[expense.category];
   const iconColor = COLORS[expense.category];
 
@@ -115,6 +118,7 @@ const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: Expens
                 <CurrencyToggle 
                   showThb={showThb} 
                   onToggle={handleToggleChange} 
+                  originalCurrency={originalCurrency}
                   size="sm" 
                 />
               </div>
@@ -164,6 +168,7 @@ const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: Expens
               variant="outline" 
               size="sm" 
               onClick={() => onConvert(expense)}
+              disabled={actionsDisabled}
               className="text-green-600 border-green-200 hover:bg-green-50"
             >
               <DollarSign className="w-4 h-4 mr-1" />
@@ -176,6 +181,7 @@ const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: Expens
               variant="outline" 
               size="sm" 
               onClick={() => onEdit(expense)}
+              disabled={actionsDisabled}
               className="flex-1"
             >
               <Edit className="w-4 h-4 mr-1" />
@@ -188,6 +194,7 @@ const ExpenseCard = ({ expense, canModify, onEdit, onDelete, onConvert }: Expens
               variant="outline" 
               size="sm" 
               onClick={handleDelete}
+              disabled={actionsDisabled}
               className="text-red-600 border-red-200 hover:bg-red-50"
             >
               <Trash2 className="w-4 h-4" />

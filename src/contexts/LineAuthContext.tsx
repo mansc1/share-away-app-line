@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { clearStoredSessionToken, getStoredSessionToken, subscribeToSessionChanges } from '@/lib/session';
+import { bootstrapLiffSession } from '@/lib/liff';
 
 interface LineUser {
   id: string;
@@ -17,7 +19,6 @@ interface LineAuthContextType {
 const LineAuthContext = createContext<LineAuthContextType | undefined>(undefined);
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = 'line_session_token';
 
 export const useLineAuth = () => {
   const context = useContext(LineAuthContext);
@@ -41,7 +42,7 @@ export const LineAuthProvider = ({ children }: { children: React.ReactNode }) =>
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        localStorage.removeItem(SESSION_KEY);
+        clearStoredSessionToken();
         return null;
       }
       return await res.json();
@@ -50,20 +51,38 @@ export const LineAuthProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, []);
 
-  useEffect(() => {
-    const init = async () => {
-      const token = localStorage.getItem(SESSION_KEY);
-      if (token) {
-        const u = await fetchMe(token);
-        setUser(u);
-      }
+  const syncUserFromSession = useCallback(async () => {
+    setLoading(true);
+    let token = getStoredSessionToken();
+    if (!token) {
+      token = await bootstrapLiffSession();
+    }
+
+    if (!token) {
+      setUser(null);
       setLoading(false);
-    };
-    init();
+      return;
+    }
+
+    let u = await fetchMe(token);
+    if (!u) {
+      const liffToken = await bootstrapLiffSession();
+      if (liffToken && liffToken !== token) {
+        u = await fetchMe(liffToken);
+      }
+    }
+
+    setUser(u);
+    setLoading(false);
   }, [fetchMe]);
 
+  useEffect(() => {
+    syncUserFromSession();
+    return subscribeToSessionChanges(syncUserFromSession);
+  }, [syncUserFromSession]);
+
   const logout = useCallback(async () => {
-    const token = localStorage.getItem(SESSION_KEY);
+    const token = getStoredSessionToken();
     if (token) {
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/auth-logout`, {
@@ -72,7 +91,7 @@ export const LineAuthProvider = ({ children }: { children: React.ReactNode }) =>
         });
       } catch { /* best effort */ }
     }
-    localStorage.removeItem(SESSION_KEY);
+    clearStoredSessionToken();
     setUser(null);
     window.location.href = '/';
   }, []);

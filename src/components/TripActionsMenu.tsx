@@ -25,7 +25,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = "line_session_token";
 
 const TripActionsMenu = () => {
-  const { trip, refetch } = useTrip();
+  const { trip, refetch, isTripSwitching } = useTrip();
   const navigate = useNavigate();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -62,6 +62,7 @@ const TripActionsMenu = () => {
   const handleArchive = async () => {
     const ok = await callFunction("archive-trip");
     if (ok) {
+      await refetch();
       toast({ title: "จบทริปแล้ว", description: "ทริปถูกจบเรียบร้อย" });
       setArchiveOpen(false);
       navigate("/trip/new");
@@ -71,6 +72,7 @@ const TripActionsMenu = () => {
   const handleCancel = async () => {
     const ok = await callFunction("cancel-trip");
     if (ok) {
+      await refetch();
       toast({ title: "ยกเลิกทริปแล้ว", description: "ทริปถูกยกเลิกเรียบร้อย" });
       setCancelOpen(false);
       setCancelConfirmText("");
@@ -86,7 +88,7 @@ const TripActionsMenu = () => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="p-1.5 text-gray-400 hover:text-gray-600" title="ตัวเลือกทริป">
+          <button className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-50" title="ตัวเลือกทริป" disabled={isTripSwitching}>
             <Settings className="w-4 h-4" />
           </button>
         </DropdownMenuTrigger>
@@ -107,7 +109,7 @@ const TripActionsMenu = () => {
       </DropdownMenu>
 
       {/* Archive Dialog */}
-      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+      <AlertDialog open={archiveOpen} onOpenChange={(open) => { if (!isTripSwitching) setArchiveOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>จบทริป</AlertDialogTitle>
@@ -125,7 +127,7 @@ const TripActionsMenu = () => {
       </AlertDialog>
 
       {/* Cancel Dialog */}
-      <AlertDialog open={cancelOpen} onOpenChange={(open) => { setCancelOpen(open); if (!open) setCancelConfirmText(""); }}>
+      <AlertDialog open={cancelOpen} onOpenChange={(open) => { if (!isTripSwitching) { setCancelOpen(open); if (!open) setCancelConfirmText(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ยกเลิกทริป</AlertDialogTitle>

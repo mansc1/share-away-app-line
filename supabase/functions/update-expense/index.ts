@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
+import { normalizeExpenseCurrency } from "../_shared/currency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,32 +13,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-async function authenticateUser(supabase: any, req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const { data: session } = await supabase
-    .from("line_sessions")
-    .select("user_id, expires_at")
-    .eq("session_token", sessionToken)
-    .single();
-
-  if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) {
-    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-    return null;
-  }
-
-  const { data: user } = await supabase
-    .from("line_users")
-    .select("id, line_sub, display_name")
-    .eq("id", session.user_id)
-    .single();
-
-  return user ?? null;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -52,7 +28,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const user = await authenticateUser(supabase, req);
+    const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json();
@@ -93,7 +69,7 @@ Deno.serve(async (req) => {
       .from("trip_members")
       .select("id, role")
       .eq("trip_id", trip_id)
-      .eq("user_id", user.line_sub)
+      .eq("user_id", user.id)
       .single();
 
     if (!currentMember) {
@@ -102,7 +78,7 @@ Deno.serve(async (req) => {
 
     // Permission check
     const isAdmin = currentMember.role === "admin";
-    const isCreator = expense.created_by_user_id != null && expense.created_by_user_id === user.line_sub;
+    const isCreator = expense.created_by_user_id != null && expense.created_by_user_id === user.id;
 
     if (!isAdmin && !isCreator) {
       return json({ code: "forbidden", message: "คุณไม่มีสิทธิ์แก้ไขรายจ่ายนี้" }, 403);
@@ -110,7 +86,7 @@ Deno.serve(async (req) => {
 
     // Build update payload
     const updateData: Record<string, any> = {
-      updated_by_user_id: user.line_sub,
+      updated_by_user_id: user.id,
       updated_at: new Date().toISOString(),
     };
 
@@ -120,7 +96,13 @@ Deno.serve(async (req) => {
     if (body.time !== undefined) updateData.time = body.time;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.amount !== undefined) updateData.amount = body.amount;
-    if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.currency !== undefined) {
+      const normalizedCurrency = normalizeExpenseCurrency(body.currency);
+      if (!normalizedCurrency) {
+        return json({ code: "invalid_currency", message: "สกุลเงินไม่รองรับ" }, 400);
+      }
+      updateData.currency = normalizedCurrency;
+    }
     if (body.thb_amount !== undefined) updateData.thb_amount = body.thb_amount;
     if (body.is_converted_to_thb !== undefined) updateData.is_converted_to_thb = body.is_converted_to_thb;
 

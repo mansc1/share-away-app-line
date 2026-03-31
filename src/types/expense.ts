@@ -23,6 +23,24 @@ export interface PaymentSummary {
   amount: number;
 }
 
+export interface Payment {
+  id: string;
+  tripId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  settlementAmount: number | null;
+  settlementCurrency: string | null;
+  isAuthoritativeSettlement: boolean;
+  status: "pending" | "paid" | "confirmed";
+  createdAt: string;
+  paidAt: string | null;
+  confirmedAt: string | null;
+  createdByUserId: string;
+  updatedByUserId: string;
+  updatedAt: string | null;
+}
+
 export interface PersonBalance {
   name: string;
   balance: number;

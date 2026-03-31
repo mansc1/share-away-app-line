@@ -3,11 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Expense } from "@/types/expense";
 import { Car, Utensils, Ticket, Clipboard } from "lucide-react";
-import { EXCHANGE_RATE } from "@/constants/currency";
+import { type CurrencyType } from "@/constants/currency";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 
 interface ExpenseChartProps {
   expenses: Expense[];
+  currency: CurrencyType;
 }
 
 const COLORS = {
@@ -31,9 +32,8 @@ const CATEGORY_ICONS = {
   other: Clipboard
 };
 
-const ExpenseChart = ({ expenses }: ExpenseChartProps) => {
-  const totalExpensesCNY = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const totalExpensesTHB = Math.round(totalExpensesCNY * EXCHANGE_RATE * 100) / 100;
+const ExpenseChart = ({ expenses, currency }: ExpenseChartProps) => {
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   
   const categoryData = expenses.reduce((acc, expense) => {
     const category = expense.category;
@@ -46,7 +46,7 @@ const ExpenseChart = ({ expenses }: ExpenseChartProps) => {
       name: CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS],
       value: amount,
       color: COLORS[category as keyof typeof COLORS],
-      percentage: Math.round((amount / totalExpensesCNY) * 100),
+      percentage: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
       category: category,
       Icon: CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS]
     }))
@@ -58,23 +58,13 @@ const ExpenseChart = ({ expenses }: ExpenseChartProps) => {
         <div className="text-center mb-4">
           <div className="mb-3">
             <CurrencyDisplay 
-              amount={totalExpensesCNY} 
-              currency="CNY" 
+              amount={totalExpenses} 
+              currency={currency}
               className="text-3xl font-bold"
-            />
-          </div>
-          <div className="mb-1">
-            <CurrencyDisplay 
-              amount={totalExpensesTHB} 
-              currency="THB" 
-              className="text-xl font-semibold"
             />
           </div>
           <div className="text-base text-gray-500 font-medium">
             รายจ่ายทั้งหมด
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            อัตราแลกเปลี่ยน: 1¥ = {EXCHANGE_RATE}฿
           </div>
         </div>
         

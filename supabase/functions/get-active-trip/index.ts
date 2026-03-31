@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,26 +12,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-async function authenticateUser(supabase: any, req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const { data: session } = await supabase
-    .from("line_sessions")
-    .select("user_id, expires_at")
-    .eq("session_token", sessionToken)
-    .single();
-
-  if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) {
-    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-    return null;
-  }
-
-  return { id: session.user_id };
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +28,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const user = await authenticateUser(supabase, req);
+    const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ code: "unauthorized", message: "Not authenticated" }, 403);
 
     const { data: activeTrip } = await supabase
@@ -60,9 +41,20 @@ Deno.serve(async (req) => {
       return json({ trip: null });
     }
 
+    const { data: membership } = await supabase
+      .from("trip_members")
+      .select("id")
+      .eq("trip_id", activeTrip.trip_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!membership) {
+      return json({ trip: null });
+    }
+
     const { data: trip, error: tripErr } = await supabase
       .from("trips")
-      .select("id, name, start_date, end_date, capacity_total, status, created_by_user_id, confirmed_at")
+      .select("id, name, start_date, end_date, capacity_total, status, created_by_user_id, confirmed_at, destination_country_code, default_expense_currency")
       .eq("id", activeTrip.trip_id)
       .single();
 

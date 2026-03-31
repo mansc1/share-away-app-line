@@ -10,10 +10,10 @@ const PaymentInfoCard = () => {
             <span className="text-xl">💡</span>
           </div>
           <p className="text-sm text-blue-700 font-medium mb-1">
-            การคำนวณอัตโนมัติ
+            สถานะจะอัปเดตแบบเรียลไทม์
           </p>
           <p className="text-xs text-blue-600">
-            ใช้จำนวนการโอนเงินน้อยที่สุดเพื่อความสะดวก
+            ผู้โอนกดว่าจ่ายแล้ว และผู้รับยืนยันว่าได้รับเงินแล้ว
           </p>
         </div>
       </CardContent>

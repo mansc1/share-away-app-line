@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,26 +12,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-async function authenticateUser(supabase: any, req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const { data: session } = await supabase
-    .from("line_sessions")
-    .select("user_id, expires_at")
-    .eq("session_token", sessionToken)
-    .single();
-
-  if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) {
-    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-    return null;
-  }
-
-  return { id: session.user_id };
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +28,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const user = await authenticateUser(supabase, req);
+    const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ code: "unauthorized", message: "Not authenticated" }, 403);
 
     const body = await req.json();
@@ -91,13 +72,13 @@ Deno.serve(async (req) => {
     if (userIds.length > 0) {
       const { data: lineUsers } = await supabase
         .from("line_users")
-        .select("line_sub, avatar_url")
-        .in("line_sub", userIds);
+        .select("id, avatar_url")
+        .in("id", userIds);
 
       if (lineUsers) {
         for (const lu of lineUsers) {
           if (lu.avatar_url) {
-            avatarMap[lu.line_sub] = lu.avatar_url;
+            avatarMap[lu.id] = lu.avatar_url;
           }
         }
       }

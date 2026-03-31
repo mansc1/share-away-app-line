@@ -2,13 +2,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { PersonBalance } from "@/types/expense";
+import { CURRENCY_SYMBOLS, type CurrencyType } from "@/constants/currency";
 
 interface BalanceChartProps {
   balances: PersonBalance[];
+  currency: CurrencyType;
 }
 
-const BalanceChart = ({ balances }: BalanceChartProps) => {
-  const formatCNY = (value: number) => `¥${Math.abs(value)}`;
+const BalanceChart = ({ balances, currency }: BalanceChartProps) => {
+  const formatBalance = (value: number) => `${CURRENCY_SYMBOLS[currency] ?? ""}${Math.abs(value)}`;
 
   return (
     <Card>
@@ -31,7 +33,7 @@ const BalanceChart = ({ balances }: BalanceChartProps) => {
               />
               <YAxis 
                 tick={{ fontSize: 10 }}
-                tickFormatter={formatCNY}
+                tickFormatter={formatBalance}
               />
               <Bar 
                 dataKey="balance" 

@@ -1,129 +1,113 @@
-
-import { useState, useEffect } from "react";
 import { Expense } from "@/types/expense";
-import { calculateOptimalPayments, groupPaymentsBySender } from "@/utils/paymentCalculations";
+import { useMemo, useEffect } from "react";
 import PaymentPageHeader from "@/components/PaymentPageHeader";
 import PaymentEmptyState from "@/components/PaymentEmptyState";
 import PaymentSummaryCard from "@/components/PaymentSummaryCard";
 import PaymentCard from "@/components/PaymentCard";
 import PaymentInfoCard from "@/components/PaymentInfoCard";
-import CurrencyToggle from "@/components/shared/CurrencyToggle";
+import PaymentStatusState from "@/components/PaymentStatusState";
+import { usePayments } from "@/hooks/usePayments";
+import { useTrip } from "@/contexts/TripContext";
 
 interface PaymentPageProps {
   expenses: Expense[];
+  actionsDisabled?: boolean;
 }
 
-const PaymentPage = ({ expenses }: PaymentPageProps) => {
-  const [showThb, setShowThb] = useState(() => {
-    const saved = localStorage.getItem('payment-currency-toggle');
-    return saved ? JSON.parse(saved) : false;
-  });
-  
+const PaymentPage = ({ expenses, actionsDisabled }: PaymentPageProps) => {
+  const { trip, members, currentMember, isAdmin } = useTrip();
+  const {
+    payments,
+    loading,
+    hasLegacyPayments,
+    hasAuthoritativePayments,
+    settlementBlockingCode,
+    settlementBlockingMessage,
+    incompleteExpenseCount,
+    sampleExpenseNames,
+    syncPayments,
+    markAsPaid,
+    confirmPayment,
+  } = usePayments();
+
+  const expenseSignature = useMemo(
+    () => expenses.map((expense) => `${expense.id}:${expense.updatedAt ?? ""}:${expense.amount}:${expense.paidBy}:${expense.sharedBy.join(",")}`).join("|"),
+    [expenses],
+  );
+
   useEffect(() => {
-    localStorage.setItem('payment-currency-toggle', JSON.stringify(showThb));
-  }, [showThb]);
+    if (!expenseSignature) return;
+    syncPayments();
+  }, [expenseSignature, syncPayments]);
 
-  // Get expenses based on individual toggles
-  const getProcessedExpenses = () => {
-    return expenses.map(expense => {
-      const expenseToggle = localStorage.getItem(`expense-toggle-${expense.id}`);
-      const useThb = expenseToggle ? JSON.parse(expenseToggle) : false;
-      
-      if (useThb && expense.isConvertedToThb && expense.thbAmount) {
-        return {
-          ...expense,
-          amount: expense.thbAmount,
-          currency: 'THB'
-        };
-      } else {
-        return {
-          ...expense,
-          currency: 'CNY'
-        };
-      }
-    });
-  };
+  const memberNameMap = useMemo(() => {
+    const entries = members.map((member) => [member.user_id, member.display_name]);
+    return new Map(entries);
+  }, [members]);
 
-  // Separate expenses by currency based on individual toggles
-  const processedExpenses = getProcessedExpenses();
-  const cnyExpenses = processedExpenses.filter(exp => exp.currency === 'CNY');
-  const thbExpenses = processedExpenses.filter(exp => exp.currency === 'THB');
+  const outstandingTotal = payments
+    .filter((payment) => payment.status !== "confirmed")
+    .reduce((sum, payment) => sum + (payment.settlementAmount ?? 0), 0);
 
-  // Calculate payments for each currency
-  const cnyPayments = cnyExpenses.length > 0 ? calculateOptimalPayments(cnyExpenses) : [];
-  const thbPayments = thbExpenses.length > 0 ? calculateOptimalPayments(thbExpenses) : [];
-
-  // Group payments by sender for each currency
-  const groupedCnyPayments = groupPaymentsBySender(cnyPayments);
-  const groupedThbPayments = groupPaymentsBySender(thbPayments);
-
-  // Calculate totals for each currency
-  const totalCnyPayments = cnyPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalThbPayments = thbPayments.reduce((sum, payment) => sum + payment.amount, 0);
-
-  // Determine which currency to show based on what has payments
-  const hasThbPayments = groupedThbPayments.length > 0;
-  const hasCnyPayments = groupedCnyPayments.length > 0;
-  
-  // Auto-switch to appropriate currency
-  const effectiveShowThb = hasThbPayments && !hasCnyPayments ? true : 
-                          !hasThbPayments && hasCnyPayments ? false : 
-                          showThb;
-
-  const currentPayments = effectiveShowThb ? groupedThbPayments : groupedCnyPayments;
-  const currentTotal = effectiveShowThb ? totalThbPayments : totalCnyPayments;
-  const payersCount = currentPayments.length;
-
-  const handleToggleChange = (newShowThb: boolean) => {
-    // Only allow toggle if both currencies have payments
-    if (hasThbPayments && hasCnyPayments) {
-      setShowThb(newShowThb);
-    }
-  };
-
-  const shouldShowToggle = hasThbPayments && hasCnyPayments;
+  const pendingCount = payments.filter((payment) => payment.status === "pending").length;
+  const paidCount = payments.filter((payment) => payment.status === "paid").length;
+  const confirmedCount = payments.filter((payment) => payment.status === "confirmed").length;
 
   return (
     <div className="p-4 pb-20 space-y-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-      <div className="flex justify-between items-center">
-        <PaymentPageHeader totalPayments={currentTotal} showThb={effectiveShowThb} />
-        {shouldShowToggle && (
-          <CurrencyToggle showThb={effectiveShowThb} onToggle={handleToggleChange} />
+      <div className="flex justify-center">
+        {trip && (
+          <PaymentPageHeader
+            totalPayments={outstandingTotal}
+            trip={trip}
+            payments={payments}
+            memberNameMap={memberNameMap}
+            settlementBlockingCode={settlementBlockingCode}
+            hasLegacyPayments={hasLegacyPayments}
+          />
         )}
       </div>
 
-      {/* Show currency breakdown */}
-      {hasThbPayments && hasCnyPayments && (
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold mb-2">สรุปการโอนแยกตามสกุลเงิน</h3>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>การโอนเป็นหยวน:</span>
-              <span className="font-medium">¥{totalCnyPayments.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>การโอนเป็นบาท:</span>
-              <span className="font-medium">฿{totalThbPayments.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {currentPayments.length === 0 ? (
+      {!loading && settlementBlockingCode === "settlement_currency_incomplete" ? (
+        <PaymentStatusState
+          emoji="฿"
+          title="ยังสร้างยอดโอนไม่ได้"
+          description={settlementBlockingMessage || "ยังมีรายจ่ายบางรายการที่ต้องแปลงเป็นเงินบาทก่อน"}
+          details={
+            incompleteExpenseCount
+              ? `มี ${incompleteExpenseCount} รายการที่ยังไม่พร้อม${sampleExpenseNames.length ? ` เช่น ${sampleExpenseNames.join(", ")}` : ""}`
+              : undefined
+          }
+        />
+      ) : !loading && !hasAuthoritativePayments && hasLegacyPayments ? (
+        <PaymentStatusState
+          emoji="!"
+          title="มียอดโอนแบบเก่าอยู่"
+          description="ข้อมูลยอดโอนเดิมยังไม่ใช่ยอด settlement แบบเงินบาทที่เชื่อถือได้"
+          details="โปรดทำให้รายจ่ายทุกตัวพร้อมสำหรับ THB settlement แล้วให้ระบบสร้างยอดโอนใหม่อีกครั้ง"
+        />
+      ) : !loading && payments.length === 0 ? (
         <PaymentEmptyState />
       ) : (
         <>
-          <PaymentSummaryCard 
-            paymentsCount={effectiveShowThb ? thbPayments.length : cnyPayments.length} 
-            payersCount={payersCount} 
+          <PaymentSummaryCard
+            pendingCount={pendingCount}
+            paidCount={paidCount}
+            confirmedCount={confirmedCount}
           />
 
           <div className="space-y-4">
-            {currentPayments.map((groupedPayment, index) => (
-              <PaymentCard 
-                key={index} 
-                groupedPayment={groupedPayment} 
-                showThb={effectiveShowThb}
+            {payments.map((payment) => (
+              <PaymentCard
+                key={payment.id}
+                payment={payment}
+                fromName={memberNameMap.get(payment.fromUserId) || "สมาชิก"}
+                toName={memberNameMap.get(payment.toUserId) || "สมาชิก"}
+                canMarkPaid={!!currentMember && (payment.fromUserId === currentMember.user_id || isAdmin)}
+                canConfirm={!!currentMember && (payment.toUserId === currentMember.user_id || isAdmin)}
+                actionsDisabled={actionsDisabled}
+                onMarkPaid={() => markAsPaid(payment.id)}
+                onConfirm={() => confirmPayment(payment.id)}
               />
             ))}
           </div>

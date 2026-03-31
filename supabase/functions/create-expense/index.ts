@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateLineUser } from "../_shared/auth.ts";
+import { normalizeExpenseCurrency } from "../_shared/currency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,32 +13,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-async function authenticateUser(supabase: any, req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const { data: session } = await supabase
-    .from("line_sessions")
-    .select("user_id, expires_at")
-    .eq("session_token", sessionToken)
-    .single();
-
-  if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) {
-    await supabase.from("line_sessions").delete().eq("session_token", sessionToken);
-    return null;
-  }
-
-  const { data: user } = await supabase
-    .from("line_users")
-    .select("id, line_sub, display_name")
-    .eq("id", session.user_id)
-    .single();
-
-  return user ?? null;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -52,11 +28,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const user = await authenticateUser(supabase, req);
+    const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json();
-    const { trip_id, name, date, time, category, amount, paid_by, shared_by } = body;
+    const { trip_id, name, date, time, category, amount, paid_by, shared_by, currency } = body;
 
     if (!trip_id || !name || !date || !time || !category || amount == null || !paid_by) {
       return json({ error: "Missing required fields" }, 400);
@@ -79,7 +55,7 @@ Deno.serve(async (req) => {
       .from("trip_members")
       .select("id, role")
       .eq("trip_id", trip_id)
-      .eq("user_id", user.line_sub)
+      .eq("user_id", user.id)
       .single();
 
     if (!currentMember) {
@@ -113,6 +89,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    const normalizedCurrency = currency == null ? "THB" : normalizeExpenseCurrency(currency);
+    if (!normalizedCurrency) {
+      return json({ code: "invalid_currency", message: "สกุลเงินไม่รองรับ" }, 400);
+    }
+
     // Insert expense
     const { data: expense, error: insertErr } = await supabase
       .from("expenses")
@@ -125,12 +106,12 @@ Deno.serve(async (req) => {
         amount,
         paid_by,
         shared_by: sharedByArray,
-        currency: "CNY",
+        currency: normalizedCurrency,
         thb_amount: null,
         is_converted_to_thb: false,
         user_id: null,
-        created_by_user_id: user.line_sub,
-        updated_by_user_id: user.line_sub,
+        created_by_user_id: user.id,
+        updated_by_user_id: user.id,
         updated_at: new Date().toISOString(),
       })
       .select()

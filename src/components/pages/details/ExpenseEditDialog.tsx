@@ -12,24 +12,27 @@ import { useToast } from "@/components/ui/use-toast";
 import { useTrip } from "@/contexts/TripContext";
 import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
+import { SUPPORTED_EXPENSE_CURRENCIES, type CurrencyType } from "@/constants/currency";
 
 interface ExpenseEditDialogProps {
   expense: Expense | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (id: string, updatedExpense: Omit<Expense, 'id'>) => void;
+  disabled?: boolean;
 }
 
-const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDialogProps) => {
+const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: ExpenseEditDialogProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { memberNames } = useTrip();
+  const { memberNames, trip } = useTrip();
   const [formData, setFormData] = useState({
     name: '',
     date: '',
     time: '',
     category: '',
     amount: '',
+    currency: 'THB',
     paidBy: '',
     sharedBy: [] as string[],
     thbAmount: '',
@@ -45,6 +48,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
         time: expense.time,
         category: expense.category,
         amount: expense.amount.toString(),
+        currency: expense.currency,
         paidBy: expense.paidBy,
         sharedBy: [...expense.sharedBy],
         thbAmount: expense.thbAmount?.toString() || '',
@@ -58,13 +62,14 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
         time: '',
         category: '',
         amount: '',
+        currency: trip?.default_expense_currency || 'THB',
         paidBy: '',
         sharedBy: [],
         thbAmount: '',
         isConvertedToThb: false
       });
     }
-  }, [expense]);
+  }, [expense, trip?.default_expense_currency]);
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -110,7 +115,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!expense || !validateForm()) return;
+    if (disabled || !expense || !validateForm()) return;
 
     setLoading(true);
     console.log('ExpenseEditDialog - Updating expense with data:', formData);
@@ -127,7 +132,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
         paidBy: formData.paidBy,
         sharedBy: formData.sharedBy,
         tripId: expense.tripId,
-        currency: 'CNY', // Always CNY
+        currency: formData.currency,
         thbAmount,
         isConvertedToThb: formData.isConvertedToThb
       };
@@ -162,7 +167,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
   const hasSelection = formData.sharedBy.length > 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => { if (!disabled) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-lg">แก้ไขรายจ่าย</DialogTitle>
@@ -177,13 +182,14 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
               placeholder="เช่น ค่าโรงแรม"
               maxLength={100}
               className="text-sm"
+              disabled={disabled || loading}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label htmlFor="edit-date" className="text-sm">วันที่ *</Label>
-              <Select value={formData.date} onValueChange={(value) => setFormData(prev => ({ ...prev, date: value }))}>
+              <Select value={formData.date} onValueChange={(value) => setFormData(prev => ({ ...prev, date: value }))} disabled={disabled}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder="เลือกวันที่" />
                 </SelectTrigger>
@@ -202,13 +208,14 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
                 value={formData.time}
                 onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
                 className="text-sm"
+                disabled={disabled || loading}
               />
             </div>
           </div>
 
           <div>
             <Label htmlFor="edit-category" className="text-sm">ประเภท *</Label>
-            <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+            <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))} disabled={disabled}>
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder="เลือกประเภท" />
               </SelectTrigger>
@@ -223,7 +230,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label htmlFor="edit-amount" className="text-sm">
-                จำนวนเงิน (<CurrencyDisplay amount={0} currency="CNY" showSymbol={true} className="text-sm" />) *
+                จำนวนเงิน (<CurrencyDisplay amount={0} currency={(formData.currency || "THB") as CurrencyType} showSymbol={true} className="text-sm" />) *
               </Label>
               <Input
                 id="edit-amount"
@@ -234,11 +241,25 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
                 onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                 placeholder="0.00"
                 className="text-sm"
+                disabled={disabled || loading}
               />
             </div>
             <div>
+              <Label htmlFor="edit-currency" className="text-sm">สกุลเงิน *</Label>
+              <Select value={formData.currency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))} disabled={disabled}>
+                <SelectTrigger id="edit-currency" className="text-sm">
+                  <SelectValue placeholder="เลือกสกุลเงิน" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_EXPENSE_CURRENCIES.map((currency) => (
+                    <SelectItem key={currency} value={currency} className="text-sm">{currency}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="edit-paidBy" className="text-sm">คนจ่าย *</Label>
-              <Select value={formData.paidBy} onValueChange={(value) => setFormData(prev => ({ ...prev, paidBy: value }))}>
+              <Select value={formData.paidBy} onValueChange={(value) => setFormData(prev => ({ ...prev, paidBy: value }))} disabled={disabled}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder="เลือกคน" />
                 </SelectTrigger>
@@ -265,6 +286,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
                 onChange={(e) => setFormData(prev => ({ ...prev, thbAmount: e.target.value }))}
                 placeholder="0.00"
                 className="text-sm"
+                disabled={disabled || loading}
               />
               <div className="text-xs text-gray-500 mt-1">
                 *สามารถแก้ไขได้ตลอดเวลา
@@ -284,6 +306,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
                     id={`edit-${person}`}
                     checked={formData.sharedBy.includes(person)}
                     onCheckedChange={() => handlePersonToggle(person)}
+                    disabled={disabled}
                   />
                   <Label htmlFor={`edit-${person}`} className="text-xs">{person}</Label>
                 </div>
@@ -297,14 +320,14 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate }: ExpenseEditDi
               variant="outline" 
               onClick={onClose}
               className="flex-1 text-sm"
-              disabled={loading}
+              disabled={disabled || loading}
             >
               ยกเลิก
             </Button>
             <Button 
               type="submit" 
               className="flex-1 bg-blue-500 hover:bg-blue-600 text-sm"
-              disabled={loading}
+              disabled={disabled || loading}
             >
               {loading ? 'กำลังบันทึก...' : 'บันทึก'}
             </Button>
