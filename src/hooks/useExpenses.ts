@@ -107,12 +107,20 @@ export const useExpenses = () => {
 
       const nextExpense = mapExpenseRow(data as ExpenseRow);
       setExpenses(prev => [nextExpense, ...prev.filter((exp) => exp.id !== nextExpense.id)]);
-      await fetchExpenses();
       
       toast({
         title: "สำเร็จ",
         description: "เพิ่มรายจ่ายแล้ว",
       });
+
+      void fetchExpenses().catch((error: unknown) => {
+        console.error('post-create fetchExpenses error:', error);
+        toast({
+          title: "อัปเดตรายการช้าเล็กน้อย",
+          description: "บันทึกรายจ่ายสำเร็จแล้ว แต่กำลังรีเฟรชรายการใหม่",
+        });
+      });
+
       return true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "ไม่สามารถเพิ่มรายจ่ายได้";

@@ -123,7 +123,11 @@ Deno.serve(async (req) => {
 
     if (insertErr) {
       console.error("Insert expense error:", insertErr);
-      return json({ error: "Failed to create expense" }, 500);
+      return json({
+        code: "insert_failed",
+        message: insertErr.message || "ไม่สามารถบันทึกรายจ่ายได้",
+        details: insertErr.details ?? null,
+      }, 500);
     }
 
     return json(expense, 201);
