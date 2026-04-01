@@ -66,8 +66,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ trip: trip ?? null }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message || "Unexpected error" }), {
+  } catch (error: unknown) {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unexpected error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

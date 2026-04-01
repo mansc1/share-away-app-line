@@ -109,7 +109,7 @@ const ExpenseCard = ({ expense, canModify, actionsDisabled, onEdit, onDelete, on
           <div className="text-right">
             <CurrencyDisplay 
               amount={currentAmount} 
-              currency={currentCurrency as any}
+              currency={currentCurrency}
               className="text-xl font-bold"
             />
             {/* Toggle below amount */}
@@ -155,7 +155,7 @@ const ExpenseCard = ({ expense, canModify, actionsDisabled, onEdit, onDelete, on
           <div className="text-sm text-gray-600">
             คนละ: <CurrencyDisplay 
               amount={currentAmount / expense.sharedBy.length} 
-              currency={currentCurrency as any}
+              currency={currentCurrency}
               className="font-medium text-gray-600"
             />
           </div>

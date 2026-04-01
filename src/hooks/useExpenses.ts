@@ -1,6 +1,6 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import type { Database } from '@/integrations/supabase/types';
 import { Expense } from '@/types/expense';
 import { useToast } from '@/components/ui/use-toast';
 import { useTrip } from '@/contexts/TripContext';
@@ -8,6 +8,7 @@ import { useLineAuth } from '@/contexts/LineAuthContext';
 import { getStoredSessionToken } from '@/lib/session';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+type ExpenseRow = Database["public"]["Tables"]["expenses"]["Row"];
 
 function getAuthHeaders() {
   const token = getStoredSessionToken();
@@ -21,7 +22,24 @@ export const useExpenses = () => {
   const { trip, isAdmin, isTripSwitching } = useTrip();
   const { user } = useLineAuth();
   const activeTripId = trip?.id ?? null;
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const mapExpenseRow = useCallback((expense: ExpenseRow): Expense => ({
+    id: expense.id,
+    tripId: expense.trip_id,
+    name: expense.name,
+    date: expense.date,
+    time: expense.time,
+    category: expense.category as Expense["category"],
+    amount: Number(expense.amount),
+    paidBy: expense.paid_by,
+    sharedBy: expense.shared_by,
+    currency: expense.currency || 'THB',
+    thbAmount: expense.thb_amount === null ? undefined : Number(expense.thb_amount),
+    isConvertedToThb: expense.is_converted_to_thb || false,
+    createdByUserId: expense.created_by_user_id,
+    updatedByUserId: expense.updated_by_user_id,
+    updatedAt: expense.updated_at,
+  }), []);
 
   const canModifyExpense = useCallback((expense: Expense): boolean => {
     if (isAdmin) return true;
@@ -37,44 +55,30 @@ export const useExpenses = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('trip_id', activeTripId)
-        .order('created_at', { ascending: false });
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/get-trip-expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ trip_id: activeTripId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "ไม่สามารถโหลดข้อมูลรายจ่ายได้");
+      }
 
-      if (error) throw error;
-
-      const formattedExpenses: Expense[] = (data ?? []).map(expense => ({
-        id: expense.id,
-        tripId: expense.trip_id,
-        name: expense.name,
-        date: expense.date,
-        time: expense.time,
-        category: expense.category as any,
-        amount: parseFloat(expense.amount.toString()),
-        paidBy: expense.paid_by,
-        sharedBy: expense.shared_by,
-        currency: expense.currency || 'CNY',
-        thbAmount: expense.thb_amount ? parseFloat(expense.thb_amount.toString()) : undefined,
-        isConvertedToThb: expense.is_converted_to_thb || false,
-        createdByUserId: (expense as any).created_by_user_id ?? null,
-        updatedByUserId: (expense as any).updated_by_user_id ?? null,
-        updatedAt: (expense as any).updated_at ?? null,
-      }));
-
-      setExpenses(formattedExpenses);
-    } catch (error: any) {
+      const rows = Array.isArray(data.expenses) ? data.expenses as ExpenseRow[] : [];
+      setExpenses(rows.map(mapExpenseRow));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถโหลดข้อมูลรายจ่ายได้";
       console.error('fetchExpenses error:', error);
       toast({
         title: "ข้อผิดพลาด",
-        description: "ไม่สามารถโหลดข้อมูลรายจ่ายได้",
+        description: message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [activeTripId, toast]);
+  }, [activeTripId, mapExpenseRow, toast]);
 
   const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
     if (!activeTripId || isTripSwitching) return;
@@ -102,35 +106,18 @@ export const useExpenses = () => {
       }
 
       // Realtime will pick up the new row, but also optimistically add
-      const newExpense: Expense = {
-        id: data.id,
-        tripId: data.trip_id,
-        name: data.name,
-        date: data.date,
-        time: data.time,
-        category: data.category as any,
-        amount: parseFloat(data.amount.toString()),
-        paidBy: data.paid_by,
-        sharedBy: data.shared_by,
-        currency: data.currency || 'CNY',
-        thbAmount: data.thb_amount ? parseFloat(data.thb_amount.toString()) : undefined,
-        isConvertedToThb: data.is_converted_to_thb || false,
-        createdByUserId: data.created_by_user_id ?? null,
-        updatedByUserId: data.updated_by_user_id ?? null,
-        updatedAt: data.updated_at ?? null,
-      };
-
-      setExpenses(prev => [newExpense, ...prev]);
+      setExpenses(prev => [mapExpenseRow(data as ExpenseRow), ...prev]);
       
       toast({
         title: "สำเร็จ",
         description: "เพิ่มรายจ่ายแล้ว",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถเพิ่มรายจ่ายได้";
       console.error('addExpense error:', error);
       toast({
         title: "ข้อผิดพลาด",
-        description: error.message || "ไม่สามารถเพิ่มรายจ่ายได้",
+        description: message,
         variant: "destructive",
       });
     }
@@ -179,9 +166,10 @@ export const useExpenses = () => {
       );
 
       toast({ title: "สำเร็จ", description: "แก้ไขรายจ่ายแล้ว" });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถแก้ไขรายจ่ายได้";
       console.error('updateExpense error:', error);
-      toast({ title: "ข้อผิดพลาด", description: error.message || "ไม่สามารถแก้ไขรายจ่ายได้", variant: "destructive" });
+      toast({ title: "ข้อผิดพลาด", description: message, variant: "destructive" });
     }
   };
 
@@ -212,9 +200,9 @@ export const useExpenses = () => {
             : exp
         )
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('convertExpenseToCurrency error:', error);
-      throw error;
+      throw error instanceof Error ? error : new Error("Failed to convert");
     }
   };
 
@@ -246,42 +234,16 @@ export const useExpenses = () => {
 
       setExpenses(prev => prev.filter(exp => exp.id !== id));
       toast({ title: "สำเร็จ", description: "ลบรายจ่ายแล้ว" });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถลบรายจ่ายได้";
       console.error('deleteExpense error:', error);
-      toast({ title: "ข้อผิดพลาด", description: error.message || "ไม่สามารถลบรายจ่ายได้", variant: "destructive" });
+      toast({ title: "ข้อผิดพลาด", description: message, variant: "destructive" });
     }
   };
 
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
-
-  // Realtime subscription for expenses
-  useEffect(() => {
-    if (!activeTripId) return;
-
-    const channel = supabase
-      .channel(`expenses-${activeTripId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'expenses',
-          filter: `trip_id=eq.${activeTripId}`,
-        },
-        () => {
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(() => fetchExpenses(), 300);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(channel);
-    };
-  }, [activeTripId, fetchExpenses]);
 
   return {
     expenses,

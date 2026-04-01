@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ChevronsUpDown, Loader2, MapPinned, Users } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
@@ -42,12 +42,12 @@ const TripSelectorSheet = () => {
   const shouldShowSelector = trips.length > 1;
   const currentTripName = trip?.name || "เลือกทริป";
 
-  const handleSelectTrip = async (tripId: string) => {
+  const handleSelectTrip = useCallback(async (tripId: string) => {
     const ok = await setActiveTrip(tripId);
     if (ok) {
       setOpen(false);
     }
-  };
+  }, [setActiveTrip]);
 
   const listContent = useMemo(() => {
     if (loading) {
@@ -107,7 +107,7 @@ const TripSelectorSheet = () => {
         })}
       </div>
     );
-  }, [effectiveTripId, loading, persistedActiveTripId, switchingTripId, trips]);
+  }, [effectiveTripId, handleSelectTrip, loading, persistedActiveTripId, switchingTripId, trips]);
 
   if (!shouldShowSelector) return null;
 

@@ -32,13 +32,25 @@ serve(async (req) => {
     }
 
     // Format expense data for AI context
-    const expensesSummary = expenses?.map((expense: any) => {
-      const baseInfo = `${expense.name} - ${expense.amount} หยวน - จ่ายโดย: ${expense.paidBy} - แบ่งกัน: ${expense.sharedBy.join(', ')} - หมวด: ${expense.category} - วันที่: ${expense.date}`;
-      if (expense.hasThbConversion && expense.thbAmount) {
-        return `${baseInfo} (แปลงเป็น ${expense.thbAmount} บาทแล้ว)`;
-      }
-      return baseInfo;
-    }).join('\n') || 'ไม่มีข้อมูลรายจ่าย';
+    const expensesSummary = (Array.isArray(expenses) ? expenses : [])
+      .map((expense) => {
+        const typedExpense = expense as {
+          name: string;
+          amount: number;
+          paidBy: string;
+          sharedBy: string[];
+          category: string;
+          date: string;
+          hasThbConversion?: boolean;
+          thbAmount?: number;
+        };
+        const baseInfo = `${typedExpense.name} - ${typedExpense.amount} หยวน - จ่ายโดย: ${typedExpense.paidBy} - แบ่งกัน: ${typedExpense.sharedBy.join(', ')} - หมวด: ${typedExpense.category} - วันที่: ${typedExpense.date}`;
+        if (typedExpense.hasThbConversion && typedExpense.thbAmount) {
+          return `${baseInfo} (แปลงเป็น ${typedExpense.thbAmount} บาทแล้ว)`;
+        }
+        return baseInfo;
+      })
+      .join('\n') || 'ไม่มีข้อมูลรายจ่าย';
 
     const totalAmount = stats?.totalAmount || 0;
     const totalExpenses = expenses?.length || 0;
@@ -102,8 +114,8 @@ ${conversationContext ? `\n${conversationContext}` : ''}
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const aiResponse = data.choices?.[0]?.message?.content ?? "ขออภัยครับ ตอนนี้ยังตอบไม่ได้";
 
     console.log('AI Response generated successfully');
 
@@ -114,11 +126,11 @@ ${conversationContext ? `\n${conversationContext}` : ''}
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in expense-ai-chat function:', error);
     return new Response(JSON.stringify({ 
       error: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error',
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

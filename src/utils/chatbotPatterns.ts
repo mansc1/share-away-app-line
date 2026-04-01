@@ -4,7 +4,7 @@ import { ExpenseStats, formatCurrency, getCategoryLabel } from './expenseAnalyze
 
 export interface ChatResponse {
   message: string;
-  data?: any;
+  data?: Record<string, number> | Array<{ from: string; to: string; amount: number }>;
   type: 'text' | 'chart' | 'table';
 }
 

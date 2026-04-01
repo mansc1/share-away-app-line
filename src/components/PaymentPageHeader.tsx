@@ -11,6 +11,7 @@ interface PaymentPageHeaderProps {
   memberNameMap: Map<string, string>;
   settlementBlockingCode: string | null;
   hasLegacyPayments: boolean;
+  canShareSummary?: boolean;
 }
 
 const PaymentPageHeader = ({
@@ -20,6 +21,7 @@ const PaymentPageHeader = ({
   memberNameMap,
   settlementBlockingCode,
   hasLegacyPayments,
+  canShareSummary = true,
 }: PaymentPageHeaderProps) => {
   return (
     <div className="w-full rounded-[28px] bg-white/85 px-5 py-5 shadow-lg backdrop-blur-sm">
@@ -35,13 +37,15 @@ const PaymentPageHeader = ({
             />
           </div>
         </div>
-        <ShareSettlementDialog
-          trip={trip}
-          payments={payments}
-          memberNameMap={memberNameMap}
-          settlementBlockingCode={settlementBlockingCode}
-          hasLegacyPayments={hasLegacyPayments}
-        />
+        {canShareSummary ? (
+          <ShareSettlementDialog
+            trip={trip}
+            payments={payments}
+            memberNameMap={memberNameMap}
+            settlementBlockingCode={settlementBlockingCode}
+            hasLegacyPayments={hasLegacyPayments}
+          />
+        ) : null}
       </div>
     </div>
   );

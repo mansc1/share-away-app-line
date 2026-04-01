@@ -173,12 +173,13 @@ export const useUserTrips = () => {
 
       await fetchTrips();
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "สลับทริปไม่สำเร็จ";
       console.error("setActiveTrip error:", error);
-      setSwitchError(error.message || "สลับทริปไม่สำเร็จ");
+      setSwitchError(message);
       toast({
         title: "สลับทริปไม่สำเร็จ",
-        description: error.message || "ไม่สามารถเปลี่ยนทริปได้",
+        description: message,
         variant: "destructive",
       });
       return false;

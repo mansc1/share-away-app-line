@@ -21,6 +21,8 @@ import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+type ExpenseCategory = Expense["category"];
+
 interface AddExpenseFormProps {
   onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
   open?: boolean;
@@ -125,30 +127,26 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange, disabled }: AddExpen
     if (disabled || !validateForm()) return;
 
     setLoading(true);
-    console.log('AddExpenseForm - Starting form submission');
-    
     try {
       const expenseData = {
         name: formData.name.trim(),
         date: formData.date,
         time: formData.time,
-        category: formData.category as any,
+        category: formData.category as ExpenseCategory,
         amount: parseFloat(formData.amount),
         paidBy: formData.paidBy,
         sharedBy: formData.sharedBy,
         currency: formData.currency as CurrencyType,
         isConvertedToThb: false
       };
-      
-      console.log('AddExpenseForm - Calling onAddExpense with:', expenseData);
+
       await onAddExpense(expenseData);
 
-      console.log('AddExpenseForm - Successfully added expense, resetting form');
       setFormData(getInitialFormData(trip?.default_expense_currency || 'THB', currentMember?.display_name || ""));
       setSelectedDate(undefined);
       setIsOpen(false);
     } catch (error) {
-      console.error('AddExpenseForm - Error in handleSubmit:', error);
+      console.error('AddExpenseForm submit error:', error);
     } finally {
       setLoading(false);
     }

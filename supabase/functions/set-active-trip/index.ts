@@ -13,6 +13,21 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+interface TripRow {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  capacity_total: number;
+  status: string;
+  created_by_user_id: string;
+  confirmed_at: string | null;
+}
+
+interface MembershipWithTrip {
+  trips: TripRow;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -72,7 +87,7 @@ Deno.serve(async (req) => {
       return json({ error: "Failed to load active trip" }, 500);
     }
 
-    const trip = membership.trips as any;
+    const trip = (membership as MembershipWithTrip).trips;
 
     if (currentActive?.trip_id === trip_id) {
       return json({

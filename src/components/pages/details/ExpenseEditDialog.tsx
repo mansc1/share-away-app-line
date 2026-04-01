@@ -14,6 +14,8 @@ import PeopleToggleButton from "@/components/shared/PeopleToggleButton";
 import CurrencyDisplay from "@/components/shared/CurrencyDisplay";
 import { SUPPORTED_EXPENSE_CURRENCIES, type CurrencyType } from "@/constants/currency";
 
+type ExpenseCategory = Expense["category"];
+
 interface ExpenseEditDialogProps {
   expense: Expense | null;
   isOpen: boolean;
@@ -41,7 +43,6 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: Exp
 
   useEffect(() => {
     if (expense) {
-      console.log('ExpenseEditDialog - Setting form data from expense:', expense);
       setFormData({
         name: expense.name,
         date: expense.date,
@@ -55,7 +56,6 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: Exp
         isConvertedToThb: expense.isConvertedToThb
       });
     } else {
-      console.log('ExpenseEditDialog - Resetting form data');
       setFormData({
         name: '',
         date: '',
@@ -118,8 +118,6 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: Exp
     if (disabled || !expense || !validateForm()) return;
 
     setLoading(true);
-    console.log('ExpenseEditDialog - Updating expense with data:', formData);
-    
     try {
       const thbAmount = formData.thbAmount ? parseFloat(formData.thbAmount) : undefined;
       
@@ -127,7 +125,7 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: Exp
         name: formData.name.trim(),
         date: formData.date,
         time: formData.time,
-        category: formData.category as any,
+        category: formData.category as ExpenseCategory,
         amount: parseFloat(formData.amount),
         paidBy: formData.paidBy,
         sharedBy: formData.sharedBy,
@@ -138,10 +136,9 @@ const ExpenseEditDialog = ({ expense, isOpen, onClose, onUpdate, disabled }: Exp
       };
       
       await onUpdate(expense.id, updatedExpenseData);
-      console.log('ExpenseEditDialog - Successfully updated expense');
       onClose();
     } catch (error) {
-      console.error('ExpenseEditDialog - Error updating expense:', error);
+      console.error('ExpenseEditDialog update error:', error);
     } finally {
       setLoading(false);
     }

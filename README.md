@@ -1,73 +1,105 @@
-# Welcome to your Lovable project
+# Share Away App LINE
 
-## Project info
+Trip expense sharing app for LINE groups. Users sign in with LINE, create trips, invite friends, track shared expenses, and settle trip balances in THB.
 
-**URL**: https://lovable.dev/projects/ca2c55d3-bf2d-4420-8702-8827d15ea928
+## What works today
 
-## How can I edit this code?
+- LINE login via OAuth callback and LIFF session bootstrap
+- Create a trip with destination country and default expense currency
+- Invite members with share link / QR flow
+- Join trip from invite link
+- Manage members, confirm trip roster, and increase capacity
+- Add, edit, delete, and convert expenses to THB
+- Generate settlement payments and track `pending -> paid -> confirmed`
+- Switch between multiple trips
+- AI expense chat assistant
 
-There are several ways of editing your application.
+## Stack
 
-**Use Lovable**
+- Vite + React + TypeScript
+- Tailwind + shadcn/ui
+- Supabase Edge Functions + Postgres
+- LINE Login + LIFF
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ca2c55d3-bf2d-4420-8702-8827d15ea928) and start prompting.
+## Local setup
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Install dependencies:
 
-**Use your preferred IDE**
+```bash
+npm install
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+2. Create `.env` for the web app:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
+VITE_SUPABASE_PROJECT_ID=<your-project-id>
+VITE_LIFF_ID=<your-line-liff-id>
+VITE_LINE_BOT_ADD_FRIEND_URL=https://line.me/R/ti/p/<bot-id>
+VITE_APP_BASE_URL=http://localhost:5173
+```
 
-Follow these steps:
+3. Set Supabase Edge Function secrets:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+LINE_CHANNEL_ID=<line-login-channel-id>
+LINE_CHANNEL_SECRET=<line-login-channel-secret>
+LINE_REDIRECT_URI=http://localhost:5173/auth/line/callback
+APP_BASE_URL=http://localhost:5173
+LOVABLE_API_KEY=<optional-ai-key>
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Make sure your LINE Login channel allows the callback URL you configured in `LINE_REDIRECT_URI`.
 
-# Step 3: Install the necessary dependencies.
-npm i
+5. Start the app:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Supabase notes
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Custom app auth is handled by LINE session tokens stored in `line_sessions`
+- Edge functions in [supabase/config.toml](/Users/man/Desktop/share-away-app-line/supabase/config.toml) use `verify_jwt = false` because requests are authorized with the custom LINE session token, not Supabase Auth JWTs
+- Expense and payment reads now go through edge functions instead of direct public table access
+- Apply the latest migrations before testing or deploying, including [20260401100000_harden_expense_and_payment_access.sql](/Users/man/Desktop/share-away-app-line/supabase/migrations/20260401100000_harden_expense_and_payment_access.sql)
 
-**Use GitHub Codespaces**
+## Commands
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run dev
+npm run lint
+npm run build
+```
 
-## What technologies are used for this project?
+For Deno-based function tests:
 
-This project is built with:
+```bash
+deno test supabase/functions --allow-env --allow-net
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deploy checklist
 
-## How can I deploy this project?
+1. Push latest frontend code
+2. Deploy Supabase migrations
+3. Deploy Supabase edge functions
+4. Set all function secrets
+5. Confirm LINE callback URL and LIFF ID match the deployed domain
+6. Smoke test:
+   - LINE login
+   - create trip
+   - invite/join
+   - add expense
+   - convert to THB
+   - create payment settlement
+   - mark paid / confirm paid
+   - switch active trip
 
-Simply open [Lovable](https://lovable.dev/projects/ca2c55d3-bf2d-4420-8702-8827d15ea928) and click on Share -> Publish.
+## Known follow-ups
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- The production bundle is still large and should be split further
+- Realtime updates were reduced in favor of secured read paths through edge functions
+- Some ESLint warnings remain in shared shadcn/context files, but `lint` and `build` now pass

@@ -13,6 +13,20 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+interface TripMemberRow {
+  id: string;
+  user_id: string;
+  display_name: string;
+  display_name_norm: string;
+  role: string;
+  joined_at: string;
+}
+
+interface LineUserAvatarRow {
+  id: string;
+  avatar_url: string | null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -65,9 +79,9 @@ Deno.serve(async (req) => {
     const memberList = members ?? [];
 
     // Collect user_ids and fetch avatars from line_users
-    const userIds = memberList.map((m: any) => m.user_id).filter(Boolean);
+    const userIds = memberList.map((m: TripMemberRow) => m.user_id).filter(Boolean);
 
-    let avatarMap: Record<string, string> = {};
+    const avatarMap: Record<string, string> = {};
 
     if (userIds.length > 0) {
       const { data: lineUsers } = await supabase
@@ -76,7 +90,7 @@ Deno.serve(async (req) => {
         .in("id", userIds);
 
       if (lineUsers) {
-        for (const lu of lineUsers) {
+        for (const lu of lineUsers as LineUserAvatarRow[]) {
           if (lu.avatar_url) {
             avatarMap[lu.id] = lu.avatar_url;
           }
@@ -85,7 +99,7 @@ Deno.serve(async (req) => {
     }
 
     // Merge avatar_url into members
-    const enriched = memberList.map((m: any) => ({
+    const enriched = memberList.map((m: TripMemberRow) => ({
       ...m,
       avatar_url: avatarMap[m.user_id] || null,
     }));

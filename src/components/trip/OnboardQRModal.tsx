@@ -117,6 +117,20 @@ const OnboardQRModal = ({ open, onOpenChange }: OnboardQRModalProps) => {
           )}
         </div>
 
+        <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <h3 className="font-semibold text-slate-900">ขั้นตอนถัดไป</h3>
+          <ul className="mt-2 space-y-1.5 pl-5 text-sm leading-6">
+            <li className="list-disc">ให้สมาชิกสแกน QR นี้เพื่อเข้าร่วมทริป</li>
+            <li className="list-disc">เมื่อสมาชิกเข้าครบแล้ว ผู้ดูแลต้องกด &quot;เริ่มทริป&quot;</li>
+            <li className="list-disc">ก่อนเริ่มทริป สมาชิกจะยังไม่สามารถเพิ่มรายจ่ายได้</li>
+          </ul>
+          {isFull && (
+            <p className="mt-3 font-medium text-slate-900">
+              สมาชิกครบแล้ว ตรวจสอบรายชื่อก่อนเริ่มทริป
+            </p>
+          )}
+        </div>
+
       </DialogContent>
     </Dialog>
   );

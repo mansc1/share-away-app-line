@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConversationContext } from './types';
+import { ConversationContext, Message } from './types';
 
 export const useConversationContext = () => {
   const [conversationContext, setConversationContext] = useState<ConversationContext[]>([]);
@@ -15,7 +15,7 @@ export const useConversationContext = () => {
     }
   };
 
-  const updateConversationContext = (userMessage: string, botResponse: string) => {
+  const updateConversationContext = (userMessage: string, _botResponse: string) => {
     const newContext: ConversationContext[] = [...conversationContext];
     
     const userLower = userMessage.toLowerCase();
@@ -52,7 +52,7 @@ export const useConversationContext = () => {
     setConversationContext(newContext);
   };
 
-  const buildAIContext = (recentMessages: any[]) => {
+  const buildAIContext = (recentMessages: Message[]) => {
     let contextString = '';
     
     // Add conversation context

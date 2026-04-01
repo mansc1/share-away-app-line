@@ -13,6 +13,39 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+interface TripMemberRow {
+  user_id: string;
+  display_name: string;
+}
+
+interface SettlementExpenseRow {
+  name: string;
+  amount: number;
+  currency: string;
+  thb_amount: number | null;
+  paid_by: string;
+  shared_by: string[] | null;
+}
+
+interface PaymentRow {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  settlement_amount: number | null;
+  settlement_currency: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface ResolvedSuggestion {
+  trip_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  amount: number;
+  settlement_amount: number;
+  settlement_currency: string;
+}
+
 function paymentKey(fromUserId: string, toUserId: string, amount: number, currency: string) {
   return `${fromUserId}:${toUserId}:${amount.toFixed(2)}:${currency}`;
 }
@@ -64,14 +97,14 @@ Deno.serve(async (req) => {
       .select("user_id, display_name")
       .eq("trip_id", trip_id);
 
-    const memberMap = new Map((members || []).map((member: any) => [member.display_name, member.user_id]));
+    const memberMap = new Map((members || []).map((member: TripMemberRow) => [member.display_name, member.user_id]));
 
     const { data: expenses } = await supabase
       .from("expenses")
       .select("name, amount, currency, thb_amount, paid_by, shared_by")
       .eq("trip_id", trip_id);
 
-    const incompleteExpenses = (expenses || []).filter((expense: any) => {
+    const incompleteExpenses = (expenses || []).filter((expense: SettlementExpenseRow) => {
       if (expense.currency === "THB") return false;
       return expense.thb_amount === null || expense.thb_amount === undefined;
     });
@@ -81,12 +114,12 @@ Deno.serve(async (req) => {
         code: "settlement_currency_incomplete",
         message: "ยังมีรายจ่ายบางรายการที่ต้องแปลงเป็นเงินบาทก่อนสร้างยอดโอน",
         incomplete_expense_count: incompleteExpenses.length,
-        sample_expense_names: incompleteExpenses.slice(0, 3).map((expense: any) => expense.name),
+        sample_expense_names: incompleteExpenses.slice(0, 3).map((expense: SettlementExpenseRow) => expense.name),
       }, 409);
     }
 
     const suggestions = calculateSuggestedPayments(
-      (expenses || []).map((expense: any) => ({
+      (expenses || []).map((expense: SettlementExpenseRow) => ({
         settlement_amount: expense.currency === "THB"
           ? Number(expense.amount)
           : Number(expense.thb_amount),
@@ -118,10 +151,10 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("trip_id", trip_id);
 
-    const normalizedPayments = (existingPayments || []).filter((payment: any) => payment.settlement_amount !== null);
+    const normalizedPayments = (existingPayments || []).filter((payment: PaymentRow) => payment.settlement_amount !== null);
 
-    const normalizedByKey = new Map<string, any[]>();
-    normalizedPayments.forEach((payment: any) => {
+    const normalizedByKey = new Map<string, PaymentRow[]>();
+    normalizedPayments.forEach((payment: PaymentRow) => {
       const key = paymentKey(
         payment.from_user_id,
         payment.to_user_id,
@@ -134,7 +167,7 @@ Deno.serve(async (req) => {
     });
 
     const normalizedRowsToDelete: string[] = [];
-    const authoritativeExisting = new Map<string, any>();
+    const authoritativeExisting = new Map<string, PaymentRow>();
 
     normalizedByKey.forEach((paymentsForKey, key) => {
       const sorted = [...paymentsForKey].sort((a, b) => {
@@ -148,7 +181,7 @@ Deno.serve(async (req) => {
     });
 
     const suggestionKeys = new Set<string>();
-    for (const suggestion of resolvedSuggestions as any[]) {
+    for (const suggestion of resolvedSuggestions as ResolvedSuggestion[]) {
       suggestionKeys.add(paymentKey(
         suggestion.from_user_id,
         suggestion.to_user_id,
@@ -167,7 +200,7 @@ Deno.serve(async (req) => {
       await supabase.from("payments").delete().in("id", normalizedRowsToDelete);
     }
 
-    const paymentsToInsert = (resolvedSuggestions as any[])
+    const paymentsToInsert = (resolvedSuggestions as ResolvedSuggestion[])
       .filter((suggestion) => !authoritativeExisting.has(paymentKey(
         suggestion.from_user_id,
         suggestion.to_user_id,

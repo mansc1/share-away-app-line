@@ -10,7 +10,7 @@ const corsHeaders = {
 async function verifyIdToken(
   idToken: string,
   channelId: string
-): Promise<any> {
+): Promise<Record<string, unknown>> {
   const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -27,6 +27,24 @@ async function verifyIdToken(
   }
 
   return body;
+}
+
+interface TokenResponse {
+  id_token?: string;
+  [key: string]: unknown;
+}
+
+function getIdTokenKid(idToken: string): string {
+  try {
+    const header = idToken.split(".")[0];
+    if (!header) return "unknown";
+    const normalized = header.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const decoded = JSON.parse(atob(padded)) as { kid?: string };
+    return decoded.kid ?? "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 Deno.serve(async (req) => {
@@ -70,12 +88,12 @@ Deno.serve(async (req) => {
 
     const LINE_CHANNEL_ID = Deno.env.get("LINE_CHANNEL_ID")!;
     const LINE_CHANNEL_SECRET = Deno.env.get("LINE_CHANNEL_SECRET")!;
-    const redirectUri = "https://share-away-app-line.lovable.app/auth/line/callback";
+    const redirectUri = Deno.env.get("LINE_REDIRECT_URI") || "https://share-away-app-line.lovable.app/auth/line/callback";
 
     console.log("Using redirect_uri:", redirectUri);
 
     // Exchange code for tokens
-    let tokenData: any;
+    let tokenData: TokenResponse;
     try {
       const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
         method: "POST",
@@ -90,8 +108,12 @@ Deno.serve(async (req) => {
       });
 
       if (!tokenRes.ok) {
-        let lineError: any = {};
-        try { lineError = await tokenRes.json(); } catch { lineError = { raw: await tokenRes.text() }; }
+        let lineError: Record<string, unknown> = {};
+        try {
+          lineError = await tokenRes.json() as Record<string, unknown>;
+        } catch {
+          lineError = { raw: await tokenRes.text() };
+        }
         console.error("Token exchange failed:", JSON.stringify(lineError));
         return new Response(JSON.stringify({
           error: "token_exchange_failed",
@@ -123,19 +145,16 @@ Deno.serve(async (req) => {
     }
 
     // Verify id_token
-    let claims: any;
+    let claims: Record<string, unknown>;
     try {
       claims = await verifyIdToken(idToken, LINE_CHANNEL_ID);
     } catch (err) {
       const msg = (err as Error).message;
       console.error("id_token verification failed:", msg);
-      // Extract kid from token for debugging
-      let kid = "unknown";
-      try { kid = JSON.parse(atob(idToken.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).kid; } catch {}
       return new Response(JSON.stringify({
         error: "id_token_verification_failed",
         message: msg,
-        token_kid: kid,
+        token_kid: getIdTokenKid(idToken),
         redirect_uri_used: redirectUri,
       }), {
         status: 500,
@@ -143,9 +162,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const lineSub = claims.sub;
-    const displayName = claims.name || null;
-    const avatarUrl = claims.picture || null;
+    const lineSub = typeof claims.sub === "string" ? claims.sub : null;
+    const displayName = typeof claims.name === "string" ? claims.name : null;
+    const avatarUrl = typeof claims.picture === "string" ? claims.picture : null;
+    if (!lineSub) {
+      return new Response(JSON.stringify({ error: "invalid_id_token_claims" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Upsert user
     const { data: existingUser } = await supabase

@@ -10,6 +10,7 @@ import MemberNameEditor from "@/components/trip/MemberNameEditor";
 import AddCapacityDialog from "@/components/trip/AddCapacityDialog";
 import InviteShareSection from "@/components/trip/InviteShareSection";
 import OnboardQRModal from "@/components/trip/OnboardQRModal";
+import AdminPreStartPanel from "@/components/trip/AdminPreStartPanel";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SESSION_KEY = 'line_session_token';
@@ -17,6 +18,7 @@ const SESSION_KEY = 'line_session_token';
 const TripManagePage = () => {
   const { trip, members, isAdmin, isConfirmed, refetch } = useTrip();
   const [confirming, setConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [addCapOpen, setAddCapOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const { toast } = useToast();
@@ -88,6 +90,39 @@ const TripManagePage = () => {
     }
   };
 
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const token = localStorage.getItem(SESSION_KEY);
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/cancel-trip`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ trip_id: trip.id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast({
+          title: "ยกเลิกทริปไม่สำเร็จ",
+          description: data.message || "เกิดข้อผิดพลาด",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "ยกเลิกทริปแล้ว", description: "ทริปถูกยกเลิกเรียบร้อย" });
+      await refetch();
+      navigate("/trip/new");
+    } catch {
+      toast({ title: "ข้อผิดพลาด", description: "เกิดข้อผิดพลาด", variant: "destructive" });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm sticky top-0 z-10">
@@ -113,6 +148,18 @@ const TripManagePage = () => {
             <p>👥 สมาชิก {members.length}/{trip.capacity_total} คน</p>
           </CardContent>
         </Card>
+
+        {isAdmin && !isConfirmed && (
+          <AdminPreStartPanel
+            isFull={isFull}
+            memberCount={members.length}
+            capacityTotal={trip.capacity_total}
+            starting={confirming}
+            cancelling={cancelling}
+            onStart={handleConfirm}
+            onCancel={handleCancel}
+          />
+        )}
 
         {/* Member name editor (for current user, only when open) */}
         <MemberNameEditor />
@@ -154,24 +201,6 @@ const TripManagePage = () => {
 
         {/* Invite share (admin only, trip open) */}
         {isAdmin && !isConfirmed && <InviteShareSection />}
-
-        {/* Confirm button (admin only, trip open) */}
-        {isAdmin && !isConfirmed && (
-          <Button
-            className="w-full"
-            disabled={!isFull || confirming}
-            onClick={handleConfirm}
-          >
-            {confirming ? (
-              "กำลังยืนยัน..."
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                ยืนยันรายชื่อ ({members.length}/{trip.capacity_total})
-              </>
-            )}
-          </Button>
-        )}
 
         {isConfirmed && (
           <div className="text-center text-sm text-gray-500 py-2">

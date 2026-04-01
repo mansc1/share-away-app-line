@@ -10,6 +10,7 @@ import MainPage from "./pages/MainPage";
 import DetailsPage from "./pages/DetailsPage";
 import PaymentPage from "./pages/PaymentPage";
 import ChatbotPage from "./pages/ChatbotPage";
+import TripWaitingState from "./trip/TripWaitingState";
 
 const isSupportedTab = (value: string | null): value is "main" | "details" | "payment" | "chatbot" => {
   return value === "main" || value === "details" || value === "payment" || value === "chatbot";
@@ -24,7 +25,7 @@ const ExpenseApp = () => {
   }, [requestedTab]);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [addExpenseOpen, setAddExpenseOpen] = useState(requestedOpen === "add-expense");
-  const { trip, loading: tripLoading, noTrip, isTripSwitching } = useTrip();
+  const { trip, loading: tripLoading, noTrip, isTripSwitching, isAdmin, members, refetch: refetchTrip } = useTrip();
   const { 
     expenses, 
     loading, 
@@ -34,9 +35,6 @@ const ExpenseApp = () => {
     convertExpenseToCurrency,
     canModifyExpense 
   } = useExpenses();
-
-  console.log('ExpenseApp - Current expenses:', expenses);
-  console.log('ExpenseApp - Loading state:', loading);
 
   useEffect(() => {
     setCurrentPage(initialPage);
@@ -84,10 +82,24 @@ const ExpenseApp = () => {
     return <Navigate to="/trip/new" replace />;
   }
 
+  const isPreStartBlocked = !!trip && trip.status !== "confirmed" && !isAdmin;
+  const waitingState = trip ? (
+    <TripWaitingState
+      isFull={members.length >= trip.capacity_total}
+      memberCount={members.length}
+      capacityTotal={trip.capacity_total}
+      onRefresh={refetchTrip}
+    />
+  ) : null;
+
   const renderCurrentPage = () => {
+    if (isPreStartBlocked) {
+      return waitingState;
+    }
+
     switch (currentPage) {
       case 'main':
-        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching} />;
+        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching || isPreStartBlocked} />;
       case 'details':
         return (
           <DetailsPage 
@@ -96,11 +108,11 @@ const ExpenseApp = () => {
             onDeleteExpense={deleteExpense}
             onConvertExpense={convertExpenseToCurrency}
             canModifyExpense={canModifyExpense}
-            actionsDisabled={isTripSwitching}
+            actionsDisabled={isTripSwitching || isPreStartBlocked}
           />
         );
       case 'payment':
-        return <PaymentPage expenses={expenses} actionsDisabled={isTripSwitching} />;
+        return <PaymentPage expenses={expenses} actionsDisabled={isTripSwitching || isPreStartBlocked} />;
       case 'chatbot':
         return <ChatbotPage expenses={expenses} onRequestAddExpense={() => {
           setCurrentPage('main');
@@ -108,7 +120,7 @@ const ExpenseApp = () => {
           setTimeout(() => handleAddExpenseOpenChange(true), 100);
         }} />;
       default:
-        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching} />;
+        return <MainPage expenses={expenses} onAddExpense={addExpense} addExpenseOpen={addExpenseOpen} onAddExpenseOpenChange={handleAddExpenseOpenChange} actionsDisabled={isTripSwitching || isPreStartBlocked} />;
     }
   };
 

@@ -19,6 +19,22 @@ const getStatusRank = (status: string, isActive: boolean) => {
   return 2;
 };
 
+interface TripSummaryRow {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  capacity_total: number;
+  created_at: string | null;
+}
+
+interface MembershipRow {
+  trip_id: string;
+  role: string;
+  trips: TripSummaryRow;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -66,10 +82,10 @@ Deno.serve(async (req) => {
       return json({ error: "Failed to load trips" }, 500);
     }
 
-    const rows = (memberships ?? []).map((membership: any) => ({
+    const rows = (memberships ?? []).map((membership: MembershipRow) => ({
       tripId: membership.trip_id as string,
       role: membership.role as string,
-      trip: membership.trips as any,
+      trip: membership.trips,
     }));
 
     const tripIds = rows.map((row) => row.tripId);

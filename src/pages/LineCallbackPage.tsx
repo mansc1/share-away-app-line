@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { persistSessionToken } from "@/lib/session";
+import { Button } from "@/components/ui/button";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -67,10 +68,13 @@ const LineCallbackPage = () => {
           const tripData = await tripRes.json();
           navigate(tripData?.trip ? "/app" : "/trip/new", { replace: true });
         } catch {
-          navigate("/app", { replace: true });
+          navigate("/trip/new", { replace: true });
         }
-      } catch {
-        setError({ error: "network_error" });
+      } catch (exchangeError) {
+        setError({
+          error: "network_error",
+          message: exchangeError instanceof Error ? exchangeError.message : undefined,
+        });
       }
     };
 
@@ -92,7 +96,12 @@ const LineCallbackPage = () => {
             {error.token_kid && <div><span className="text-muted-foreground">token_kid:</span> {error.token_kid}</div>}
             {error.token_keys && <div><span className="text-muted-foreground">token_keys:</span> {error.token_keys.join(", ")}</div>}
           </div>
-          <a href="/" className="text-sm text-muted-foreground underline block">Back to home</a>
+          <div className="flex gap-3">
+            <Button asChild variant="outline">
+              <a href="/">กลับหน้าหลัก</a>
+            </Button>
+            <Button onClick={() => window.location.assign("/")}>ลองใหม่</Button>
+          </div>
         </div>
       </div>
     );

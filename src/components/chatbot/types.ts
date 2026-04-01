@@ -10,3 +10,7 @@ export interface ConversationContext {
   key: string;
   value: string;
 }
+
+export interface ChatContextPayload {
+  [key: string]: unknown;
+}

@@ -16,6 +16,7 @@ interface PaymentPageProps {
 
 const PaymentPage = ({ expenses, actionsDisabled }: PaymentPageProps) => {
   const { trip, members, currentMember, isAdmin } = useTrip();
+  const isTripStarted = trip?.status === "confirmed";
   const {
     payments,
     loading,
@@ -64,6 +65,7 @@ const PaymentPage = ({ expenses, actionsDisabled }: PaymentPageProps) => {
             memberNameMap={memberNameMap}
             settlementBlockingCode={settlementBlockingCode}
             hasLegacyPayments={hasLegacyPayments}
+            canShareSummary={isTripStarted}
           />
         )}
       </div>

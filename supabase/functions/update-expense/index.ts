@@ -14,6 +14,25 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+interface TripMemberNameRow {
+  display_name: string;
+}
+
+interface UpdateExpensePayload {
+  expense_id?: string;
+  trip_id?: string;
+  name?: string;
+  date?: string;
+  time?: string;
+  category?: string;
+  amount?: number;
+  currency?: string;
+  thb_amount?: number | null;
+  is_converted_to_thb?: boolean;
+  paid_by?: string;
+  shared_by?: string[];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -31,7 +50,7 @@ Deno.serve(async (req) => {
     const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const body = await req.json();
+    const body = await req.json() as UpdateExpensePayload;
     const { expense_id, trip_id } = body;
 
     if (!expense_id || !trip_id) {
@@ -85,7 +104,7 @@ Deno.serve(async (req) => {
     }
 
     // Build update payload
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, string | number | boolean | null | string[]> = {
       updated_by_user_id: user.id,
       updated_at: new Date().toISOString(),
     };
@@ -130,7 +149,7 @@ Deno.serve(async (req) => {
           .select("display_name")
           .eq("trip_id", trip_id);
 
-        const memberNames = new Set((tripMembers || []).map((m: any) => m.display_name));
+        const memberNames = new Set((tripMembers || []).map((m: TripMemberNameRow) => m.display_name));
         const invalidMembers = sharedByArray.filter((name: string) => !memberNames.has(name));
         if (invalidMembers.length > 0) {
           return json({ code: "invalid_shared_members", message: `สมาชิกไม่ถูกต้อง: ${invalidMembers.join(", ")}` }, 400);

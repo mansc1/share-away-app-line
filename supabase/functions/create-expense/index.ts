@@ -14,6 +14,10 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+interface TripMemberNameRow {
+  display_name: string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -82,7 +86,7 @@ Deno.serve(async (req) => {
         .select("display_name")
         .eq("trip_id", trip_id);
 
-      const memberNames = new Set((tripMembers || []).map((m: any) => m.display_name));
+      const memberNames = new Set((tripMembers || []).map((m: TripMemberNameRow) => m.display_name));
       const invalidMembers = sharedByArray.filter((name: string) => !memberNames.has(name));
       if (invalidMembers.length > 0) {
         return json({ code: "invalid_shared_members", message: `สมาชิกไม่ถูกต้อง: ${invalidMembers.join(", ")}` }, 400);

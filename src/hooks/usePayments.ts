@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState } from "react";
+import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/components/ui/use-toast";
 import { useTrip } from "@/contexts/TripContext";
 import { Payment } from "@/types/expense";
 import { getStoredSessionToken } from "@/lib/session";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 
 function getAuthHeaders() {
   const token = getStoredSessionToken();
@@ -23,8 +24,25 @@ export const usePayments = () => {
   const [settlementBlockingMessage, setSettlementBlockingMessage] = useState<string | null>(null);
   const [incompleteExpenseCount, setIncompleteExpenseCount] = useState<number | null>(null);
   const [sampleExpenseNames, setSampleExpenseNames] = useState<string[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeTripId = trip?.id ?? null;
+
+  const mapPaymentRow = useCallback((payment: PaymentRow): Payment => ({
+    id: payment.id,
+    tripId: payment.trip_id,
+    fromUserId: payment.from_user_id,
+    toUserId: payment.to_user_id,
+    amount: Number(payment.amount),
+    settlementAmount: payment.settlement_amount === null ? null : Number(payment.settlement_amount),
+    settlementCurrency: payment.settlement_currency ?? null,
+    isAuthoritativeSettlement: payment.settlement_amount !== null,
+    status: payment.status as Payment["status"],
+    createdAt: payment.created_at,
+    paidAt: payment.paid_at,
+    confirmedAt: payment.confirmed_at,
+    createdByUserId: payment.created_by_user_id,
+    updatedByUserId: payment.updated_by_user_id,
+    updatedAt: payment.updated_at,
+  }), []);
 
   const fetchPayments = useCallback(async () => {
     if (!activeTripId) {
@@ -45,31 +63,18 @@ export const usePayments = () => {
       setIncompleteExpenseCount(null);
       setSampleExpenseNames([]);
 
-      const { data, error } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("trip_id", activeTripId)
-        .order("created_at", { ascending: true });
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/get-trip-payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ trip_id: activeTripId }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.message || payload.error || "ไม่สามารถโหลดสถานะการโอนเงินได้");
+      }
 
-      if (error) throw error;
-
-      const formattedPayments: Payment[] = (data || []).map((payment) => ({
-        id: payment.id,
-        tripId: payment.trip_id,
-        fromUserId: payment.from_user_id,
-        toUserId: payment.to_user_id,
-        amount: Number(payment.amount),
-        settlementAmount: payment.settlement_amount === null ? null : Number(payment.settlement_amount),
-        settlementCurrency: payment.settlement_currency ?? null,
-        isAuthoritativeSettlement: payment.settlement_amount !== null,
-        status: payment.status as Payment["status"],
-        createdAt: payment.created_at,
-        paidAt: payment.paid_at,
-        confirmedAt: payment.confirmed_at,
-        createdByUserId: payment.created_by_user_id,
-        updatedByUserId: payment.updated_by_user_id,
-        updatedAt: payment.updated_at,
-      }));
+      const rows = Array.isArray(payload.payments) ? payload.payments as PaymentRow[] : [];
+      const formattedPayments: Payment[] = rows.map(mapPaymentRow);
 
       const authoritativePayments = formattedPayments.filter((payment) => payment.isAuthoritativeSettlement);
       const legacyPayments = formattedPayments.filter((payment) => !payment.isAuthoritativeSettlement);
@@ -87,7 +92,7 @@ export const usePayments = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTripId, toast]);
+  }, [activeTripId, mapPaymentRow, toast]);
 
   const syncPayments = useCallback(async () => {
     if (!activeTripId || isTripSwitching) return;
@@ -117,23 +122,7 @@ export const usePayments = () => {
       }
 
       if (Array.isArray(data.payments)) {
-        const formattedPayments: Payment[] = data.payments.map((payment: any) => ({
-          id: payment.id,
-          tripId: payment.trip_id,
-          fromUserId: payment.from_user_id,
-          toUserId: payment.to_user_id,
-          amount: Number(payment.amount),
-          settlementAmount: payment.settlement_amount === null ? null : Number(payment.settlement_amount),
-          settlementCurrency: payment.settlement_currency ?? null,
-          isAuthoritativeSettlement: payment.settlement_amount !== null,
-          status: payment.status as Payment["status"],
-          createdAt: payment.created_at,
-          paidAt: payment.paid_at,
-          confirmedAt: payment.confirmed_at,
-          createdByUserId: payment.created_by_user_id,
-          updatedByUserId: payment.updated_by_user_id,
-          updatedAt: payment.updated_at,
-        }));
+        const formattedPayments: Payment[] = data.payments.map((payment: PaymentRow) => mapPaymentRow(payment));
         const authoritativePayments = formattedPayments.filter((payment) => payment.isAuthoritativeSettlement);
         const legacyPayments = formattedPayments.filter((payment) => !payment.isAuthoritativeSettlement);
         setPayments(authoritativePayments);
@@ -150,7 +139,7 @@ export const usePayments = () => {
         variant: "destructive",
       });
     }
-  }, [activeTripId, fetchPayments, isTripSwitching, toast]);
+  }, [activeTripId, fetchPayments, isTripSwitching, mapPaymentRow, toast]);
 
   const markAsPaid = useCallback(async (paymentId: string) => {
     if (!activeTripId || isTripSwitching) return;
@@ -169,11 +158,12 @@ export const usePayments = () => {
 
       toast({ title: "บันทึกแล้ว", description: "อัปเดตสถานะเป็นจ่ายแล้ว" });
       await fetchPayments();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถอัปเดตสถานะได้";
       console.error("markAsPaid error:", error);
       toast({
         title: "ข้อผิดพลาด",
-        description: error.message || "ไม่สามารถอัปเดตสถานะได้",
+        description: message,
         variant: "destructive",
       });
     }
@@ -196,11 +186,12 @@ export const usePayments = () => {
 
       toast({ title: "ยืนยันแล้ว", description: "อัปเดตสถานะเป็นได้รับเงินแล้ว" });
       await fetchPayments();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถยืนยันการรับเงินได้";
       console.error("confirmPayment error:", error);
       toast({
         title: "ข้อผิดพลาด",
-        description: error.message || "ไม่สามารถยืนยันการรับเงินได้",
+        description: message,
         variant: "destructive",
       });
     }
@@ -209,32 +200,6 @@ export const usePayments = () => {
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
-
-  useEffect(() => {
-    if (!activeTripId) return;
-
-    const channel = supabase
-      .channel(`payments-${activeTripId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payments",
-          filter: `trip_id=eq.${activeTripId}`,
-        },
-        () => {
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(() => fetchPayments(), 250);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(channel);
-    };
-  }, [activeTripId, fetchPayments]);
 
   return {
     payments,

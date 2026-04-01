@@ -50,7 +50,7 @@ const JoinTripPage = () => {
     if (user?.display_name && !displayName) {
       setDisplayName(user.display_name);
     }
-  }, [user]);
+  }, [displayName, user]);
 
   // Fetch invite info (no auth needed)
   useEffect(() => {

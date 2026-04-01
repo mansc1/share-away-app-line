@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.auth-me]
 verify_jwt = false
 
+[functions.auth-liff-login]
+verify_jwt = false
+
 [functions.auth-logout]
 verify_jwt = false
 
@@ -21,10 +24,22 @@ verify_jwt = false
 [functions.generate-invite-link]
 verify_jwt = false
 
+[functions.get-trip-by-id]
+verify_jwt = false
+
 [functions.get-active-trip]
 verify_jwt = false
 
+[functions.get-user-trips]
+verify_jwt = false
+
 [functions.get-invite-info]
+verify_jwt = false
+
+[functions.get-trip-expenses]
+verify_jwt = false
+
+[functions.get-trip-payments]
 verify_jwt = false
 
 [functions.get-trip-members]
@@ -52,4 +67,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.delete-expense]
+verify_jwt = false
+
+[functions.create-payments]
+verify_jwt = false
+
+[functions.mark-payment-paid]
+verify_jwt = false
+
+[functions.confirm-payment]
 verify_jwt = false
