@@ -81,7 +81,7 @@ export const useExpenses = () => {
   }, [activeTripId, mapExpenseRow, toast]);
 
   const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
-    if (!activeTripId || isTripSwitching) return;
+    if (!activeTripId || isTripSwitching) return false;
 
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-expense`, {
@@ -105,13 +105,15 @@ export const useExpenses = () => {
         throw new Error(data.message || data.error || 'Failed to create expense');
       }
 
-      // Realtime will pick up the new row, but also optimistically add
-      setExpenses(prev => [mapExpenseRow(data as ExpenseRow), ...prev]);
+      const nextExpense = mapExpenseRow(data as ExpenseRow);
+      setExpenses(prev => [nextExpense, ...prev.filter((exp) => exp.id !== nextExpense.id)]);
+      await fetchExpenses();
       
       toast({
         title: "สำเร็จ",
         description: "เพิ่มรายจ่ายแล้ว",
       });
+      return true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "ไม่สามารถเพิ่มรายจ่ายได้";
       console.error('addExpense error:', error);
@@ -120,6 +122,7 @@ export const useExpenses = () => {
         description: message,
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -164,6 +167,7 @@ export const useExpenses = () => {
           exp.id === id ? { ...expense, id, createdByUserId: (data.created_by_user_id ?? exp.createdByUserId), updatedByUserId: data.updated_by_user_id, updatedAt: data.updated_at } : exp
         )
       );
+      await fetchExpenses();
 
       toast({ title: "สำเร็จ", description: "แก้ไขรายจ่ายแล้ว" });
     } catch (error: unknown) {
@@ -233,6 +237,7 @@ export const useExpenses = () => {
       }
 
       setExpenses(prev => prev.filter(exp => exp.id !== id));
+      await fetchExpenses();
       toast({ title: "สำเร็จ", description: "ลบรายจ่ายแล้ว" });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "ไม่สามารถลบรายจ่ายได้";

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 type ExpenseCategory = Expense["category"];
 
 interface AddExpenseFormProps {
-  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
+  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => Promise<boolean>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   disabled?: boolean;
@@ -140,7 +140,10 @@ const AddExpenseForm = ({ onAddExpense, open, onOpenChange, disabled }: AddExpen
         isConvertedToThb: false
       };
 
-      await onAddExpense(expenseData);
+      const ok = await onAddExpense(expenseData);
+      if (!ok) {
+        return;
+      }
 
       setFormData(getInitialFormData(trip?.default_expense_currency || 'THB', currentMember?.display_name || ""));
       setSelectedDate(undefined);

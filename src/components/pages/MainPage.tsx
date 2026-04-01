@@ -10,7 +10,7 @@ import { type CurrencyType } from "@/constants/currency";
 
 interface MainPageProps {
   expenses: Expense[];
-  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => void;
+  onAddExpense: (expense: Omit<Expense, 'id' | 'tripId'>) => Promise<boolean>;
   addExpenseOpen?: boolean;
   onAddExpenseOpenChange?: (open: boolean) => void;
   actionsDisabled?: boolean;
