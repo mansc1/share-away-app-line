@@ -264,7 +264,7 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
       setTripSwitchingToId(null);
       setLoading(false);
     }
-  }, [authLoading, isAuthenticated, fetchTrip]);
+  }, [authLoading, isAuthenticated, user?.id, fetchTrip]);
 
   const currentMember = user
     ? members.find(m => m.user_id === user.id) ?? null
