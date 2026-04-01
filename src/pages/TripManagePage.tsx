@@ -1,30 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTrip } from "@/contexts/TripContext";
-import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Crown, User, CheckCircle2, UserPlus, QrCode } from "lucide-react";
+import { ArrowLeft, Crown, User, UserPlus, QrCode } from "lucide-react";
 import MemberNameEditor from "@/components/trip/MemberNameEditor";
 import AddCapacityDialog from "@/components/trip/AddCapacityDialog";
 import InviteShareSection from "@/components/trip/InviteShareSection";
 import OnboardQRModal from "@/components/trip/OnboardQRModal";
 import AdminPreStartPanel from "@/components/trip/AdminPreStartPanel";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SESSION_KEY = 'line_session_token';
+import { useTripAdminActions } from "@/hooks/useTripAdminActions";
 
 const TripManagePage = () => {
-  const { trip, members, isAdmin, isConfirmed, refetch } = useTrip();
-  const [confirming, setConfirming] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const { trip, members, isAdmin, isConfirmed } = useTrip();
   const [addCapOpen, setAddCapOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
   const prevMemberIdsRef = useRef<Set<string>>(new Set());
   const [newMemberIds, setNewMemberIds] = useState<Set<string>>(new Set());
+  const { starting, cancelling, startTrip, cancelTrip } = useTripAdminActions();
 
   useEffect(() => {
     const currentIds = new Set(members.map(m => m.id));
@@ -52,76 +47,6 @@ const TripManagePage = () => {
   }
 
   const isFull = members.length === trip.capacity_total;
-
-  const handleConfirm = async () => {
-    setConfirming(true);
-    try {
-      const token = localStorage.getItem(SESSION_KEY);
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/confirm-trip`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ trip_id: trip.id }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        const messages: Record<string, string> = {
-          capacity_not_full: data.message || "สมาชิกยังไม่ครบ",
-          forbidden: "เฉพาะแอดมินเท่านั้น",
-          invalid_status: "ทริปไม่ได้อยู่ในสถานะเปิด",
-        };
-        toast({
-          title: "ไม่สามารถยืนยันได้",
-          description: messages[data.code] || data.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({ title: "สำเร็จ", description: "ยืนยันรายชื่อเรียบร้อย" });
-      await refetch();
-    } catch {
-      toast({ title: "ข้อผิดพลาด", description: "เกิดข้อผิดพลาด", variant: "destructive" });
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const handleCancel = async () => {
-    setCancelling(true);
-    try {
-      const token = localStorage.getItem(SESSION_KEY);
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/cancel-trip`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ trip_id: trip.id }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast({
-          title: "ยกเลิกทริปไม่สำเร็จ",
-          description: data.message || "เกิดข้อผิดพลาด",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({ title: "ยกเลิกทริปแล้ว", description: "ทริปถูกยกเลิกเรียบร้อย" });
-      await refetch();
-      navigate("/trip/new");
-    } catch {
-      toast({ title: "ข้อผิดพลาด", description: "เกิดข้อผิดพลาด", variant: "destructive" });
-    } finally {
-      setCancelling(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -154,10 +79,10 @@ const TripManagePage = () => {
             isFull={isFull}
             memberCount={members.length}
             capacityTotal={trip.capacity_total}
-            starting={confirming}
+            starting={starting}
             cancelling={cancelling}
-            onStart={handleConfirm}
-            onCancel={handleCancel}
+            onStart={startTrip}
+            onCancel={cancelTrip}
           />
         )}
 
