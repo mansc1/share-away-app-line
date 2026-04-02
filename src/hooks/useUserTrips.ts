@@ -29,6 +29,10 @@ function getAuthHeaders() {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+interface FetchTripsOptions {
+  silent?: boolean;
+}
+
 export const useUserTrips = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,7 +63,7 @@ export const useUserTrips = () => {
     };
   }, [effectiveTripId, persistedActiveTripId, isTripOverrideActive]);
 
-  const fetchTrips = useCallback(async () => {
+  const fetchTrips = useCallback(async ({ silent = false }: FetchTripsOptions = {}) => {
     if (!getStoredSessionToken()) {
       setTrips([]);
       setLoading(false);
@@ -78,18 +82,20 @@ export const useUserTrips = () => {
       setTrips(data.trips || []);
     } catch (error) {
       console.error("fetchTrips error:", error);
-      toast({
-        title: "ข้อผิดพลาด",
-        description: "ไม่สามารถโหลดรายการทริปได้",
-        variant: "destructive",
-      });
+      if (!silent) {
+        toast({
+          title: "ข้อผิดพลาด",
+          description: "ไม่สามารถโหลดรายการทริปได้",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchTrips();
+    fetchTrips({ silent: true });
   }, [fetchTrips]);
 
   const navigateWithoutTripOverride = useCallback(() => {
@@ -171,7 +177,7 @@ export const useUserTrips = () => {
         return false;
       }
 
-      await fetchTrips();
+      await fetchTrips({ silent: true });
       return true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "สลับทริปไม่สำเร็จ";
