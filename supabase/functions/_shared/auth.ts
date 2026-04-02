@@ -5,6 +5,10 @@ export interface AuthenticatedLineUser {
   avatar_url?: string | null;
 }
 
+export function getAuthIdentityValues(user: AuthenticatedLineUser): string[] {
+  return Array.from(new Set([user.id, user.line_sub].filter(Boolean)));
+}
+
 interface SupabaseLikeClient {
   from: (table: string) => {
     select: (query: string) => {

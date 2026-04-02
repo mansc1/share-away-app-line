@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authenticateLineUser } from "../_shared/auth.ts";
+import { authenticateLineUser, getAuthIdentityValues } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,12 +52,14 @@ Deno.serve(async (req) => {
       return json({ code: "bad_request", message: "trip_id is required" }, 400);
     }
 
+    const identityValues = getAuthIdentityValues(user);
+
     // Verify caller is a member
     const { data: membership } = await supabase
       .from("trip_members")
       .select("id")
       .eq("trip_id", trip_id)
-      .eq("user_id", user.id)
+      .in("user_id", identityValues)
       .maybeSingle();
 
     if (!membership) {

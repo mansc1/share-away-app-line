@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authenticateLineUser } from "../_shared/auth.ts";
+import { authenticateLineUser, getAuthIdentityValues } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,11 +41,13 @@ serve(async (req) => {
       });
     }
 
+    const identityValues = getAuthIdentityValues(user);
+
     const { data: membership } = await supabase
       .from("trip_members")
       .select("id")
       .eq("trip_id", trip_id)
-      .eq("user_id", user.id)
+      .in("user_id", identityValues)
       .maybeSingle();
 
     if (!membership) {

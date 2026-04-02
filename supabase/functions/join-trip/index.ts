@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authenticateLineUser } from "../_shared/auth.ts";
+import { authenticateLineUser, getAuthIdentityValues } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,12 +77,14 @@ Deno.serve(async (req) => {
       return json({ error: "This trip is no longer accepting members" }, 409);
     }
 
+    const identityValues = getAuthIdentityValues(user);
+
     // Check if already a member
     const { data: existing } = await supabase
       .from("trip_members")
       .select("id")
       .eq("trip_id", trip.id)
-      .eq("user_id", user.id)
+      .in("user_id", identityValues)
       .maybeSingle();
 
     if (existing) {

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authenticateLineUser } from "../_shared/auth.ts";
+import { authenticateLineUser, getAuthIdentityValues } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,10 +31,14 @@ Deno.serve(async (req) => {
     const user = await authenticateLineUser(supabase, req);
     if (!user) return json({ code: "unauthorized", message: "Not authenticated" }, 403);
 
+    const identityValues = getAuthIdentityValues(user);
+
     const { data: activeTrip } = await supabase
       .from("user_active_trip")
       .select("trip_id")
-      .eq("user_id", user.id)
+      .in("user_id", identityValues)
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!activeTrip) {
@@ -45,7 +49,7 @@ Deno.serve(async (req) => {
       .from("trip_members")
       .select("id")
       .eq("trip_id", activeTrip.trip_id)
-      .eq("user_id", user.id)
+      .in("user_id", identityValues)
       .maybeSingle();
 
     if (!membership) {
