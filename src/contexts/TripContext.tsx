@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { useLocation } from 'react-router-dom';
 import { useLineAuth } from './LineAuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getStoredSessionToken } from '@/lib/session';
+import { getStoredSessionToken, subscribeToSessionChanges } from '@/lib/session';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -265,6 +265,15 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     }
   }, [authLoading, isAuthenticated, user?.id, fetchTrip]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    return subscribeToSessionChanges(() => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      fetchTrip();
+    });
+  }, [authLoading, fetchTrip]);
 
   const currentMember = user
     ? members.find(m => m.user_id === user.id) ?? null
