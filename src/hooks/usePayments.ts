@@ -14,7 +14,7 @@ function getAuthHeaders() {
 }
 
 export const usePayments = () => {
-  const { trip, isTripSwitching } = useTrip();
+  const { trip, isTripSwitching, isAdmin } = useTrip();
   const { toast } = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +46,18 @@ export const usePayments = () => {
 
   const fetchPayments = useCallback(async () => {
     if (!activeTripId) {
+      setPayments([]);
+      setLoading(false);
+      setHasLegacyPayments(false);
+      setHasAuthoritativePayments(false);
+      setSettlementBlockingCode(null);
+      setSettlementBlockingMessage(null);
+      setIncompleteExpenseCount(null);
+      setSampleExpenseNames([]);
+      return;
+    }
+
+    if (trip && trip.status !== "confirmed" && !isAdmin) {
       setPayments([]);
       setLoading(false);
       setHasLegacyPayments(false);
@@ -92,7 +104,7 @@ export const usePayments = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTripId, mapPaymentRow, toast]);
+  }, [activeTripId, isAdmin, mapPaymentRow, toast, trip]);
 
   const syncPayments = useCallback(async () => {
     if (!activeTripId || isTripSwitching) return;

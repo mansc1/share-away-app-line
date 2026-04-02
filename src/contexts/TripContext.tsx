@@ -73,6 +73,7 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tripRef = useRef<Trip | null>(null);
   const membersRef = useRef<TripMember[]>([]);
+  const lastUserIdRef = useRef<string | null>(null);
   const overrideTripId = useMemo(() => {
     if (location.pathname !== '/app') return null;
     const params = new URLSearchParams(location.search);
@@ -249,6 +250,15 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isAuthenticated, activeTripId, debouncedRefetch]);
 
   useEffect(() => {
+    const nextUserId = user?.id ?? null;
+    if (lastUserIdRef.current !== nextUserId) {
+      setTrip(null);
+      setMembers([]);
+      setPersistedActiveTripId(null);
+      setNoTrip(false);
+    }
+    lastUserIdRef.current = nextUserId;
+
     if (authLoading) {
       setLoading(true);
       return;
@@ -271,6 +281,11 @@ export const TripProvider = ({ children }: { children: React.ReactNode }) => {
 
     return subscribeToSessionChanges(() => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      setTrip(null);
+      setMembers([]);
+      setPersistedActiveTripId(null);
+      setNoTrip(false);
+      setLoading(true);
       fetchTrip();
     });
   }, [authLoading, fetchTrip]);

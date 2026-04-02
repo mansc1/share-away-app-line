@@ -54,6 +54,12 @@ export const useExpenses = () => {
       return;
     }
 
+    if (trip && trip.status !== "confirmed" && !isAdmin) {
+      setExpenses([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/get-trip-expenses`, {
         method: "POST",
@@ -78,7 +84,7 @@ export const useExpenses = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTripId, mapExpenseRow, toast]);
+  }, [activeTripId, isAdmin, mapExpenseRow, toast, trip]);
 
   const addExpense = async (expense: Omit<Expense, 'id' | 'tripId'>) => {
     if (!activeTripId || isTripSwitching) return false;
