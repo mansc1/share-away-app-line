@@ -106,9 +106,24 @@ export const useExpenses = () => {
         }),
       });
 
-      const data = await res.json();
+      const raw = await res.text();
+      let data: Record<string, unknown> = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          data = { message: raw };
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to create expense');
+        const message = typeof data.message === "string"
+          ? data.message
+          : typeof data.error === "string"
+            ? data.error
+            : `ไม่สามารถเพิ่มรายจ่ายได้ (HTTP ${res.status})`;
+        const details = typeof data.details === "string" ? data.details : null;
+        throw new Error(details ? `${message} (${details})` : message);
       }
 
       const nextExpense = mapExpenseRow(data as ExpenseRow);
