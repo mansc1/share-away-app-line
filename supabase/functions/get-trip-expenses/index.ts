@@ -3,8 +3,9 @@ import { authenticateLineUser, getAuthIdentityValues } from "../_shared/auth.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const json = (body: unknown, status = 200) =>
@@ -38,12 +39,18 @@ Deno.serve(async (req) => {
 
     const identityValues = getAuthIdentityValues(user);
 
-    const { data: membership } = await supabase
+    const { data: membership, error: membershipErr } = await supabase
       .from("trip_members")
       .select("id")
       .eq("trip_id", trip_id)
       .in("user_id", identityValues)
+      .limit(1)
       .maybeSingle();
+
+    if (membershipErr) {
+      console.error("get-trip-expenses membership error:", membershipErr);
+      return json({ code: "membership_lookup_failed", message: "Failed to verify membership" }, 500);
+    }
 
     if (!membership) {
       return json({ code: "forbidden", message: "You are not a member of this trip" }, 403);

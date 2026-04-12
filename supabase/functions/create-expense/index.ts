@@ -4,6 +4,7 @@ import { normalizeExpenseCurrency } from "../_shared/currency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -57,12 +58,18 @@ Deno.serve(async (req) => {
     const identityValues = getAuthIdentityValues(user);
 
     // Verify current user is a member of the trip
-    const { data: currentMember } = await supabase
+    const { data: currentMember, error: currentMemberErr } = await supabase
       .from("trip_members")
       .select("id, role")
       .eq("trip_id", trip_id)
       .in("user_id", identityValues)
-      .single();
+      .limit(1)
+      .maybeSingle();
+
+    if (currentMemberErr) {
+      console.error("create-expense membership lookup error:", currentMemberErr);
+      return json({ code: "membership_lookup_failed", message: "ไม่สามารถตรวจสอบสมาชิกทริปได้" }, 500);
+    }
 
     if (!currentMember) {
       return json({ code: "not_member", message: "คุณไม่ได้เป็นสมาชิกทริปนี้" }, 403);
@@ -135,6 +142,7 @@ Deno.serve(async (req) => {
     return json(expense, 201);
   } catch (err) {
     console.error("create-expense error:", err);
-    return json({ error: "Internal error" }, 500);
+    const message = err instanceof Error ? err.message : "Internal error";
+    return json({ error: message }, 500);
   }
 });
